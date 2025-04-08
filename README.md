@@ -3,37 +3,29 @@
 DayGuard is a secure and privacy-focused communication platform built with Spring Boot and its extensions. It leverages modern web technologies to provide a real-time, encrypted messaging experience.
 
 ## Features
-- End-to-end encrypted messaging (Comming soon !)
-- Limited message storing on database (to ensure private communication) (Comming soon !)
+- End-to-end encrypted messaging
+- Limited message storing on database (to ensure private communication)
 - Real-time communication via WebSockets
-- Secure user authentication and session management (Comming soon !)
+- Secure user authentication and session management
 - Scalable backend using Spring Boot
 
 ## Technologies Used
 - **Spring Boot** – Core framework for the backend
 - **Spring WebSockets** – Enables real-time communication
-- **Spring Security** – Handles authentication and authorization (Comming soon !)
+- **Spring Security** – Handles authentication and authorization
 - **Spring Data JPA** – Simplifies database interactions
 - **JDBC API** – Java Database Connectivity for database operations
 - **Spring Data JDBC** – Simplifies database interactions
-- **PostgreSQL** – Database support (Comming soon !)
-- **Nginx** - Used for enabling HTTPS by using reverse proxy to the Spring-boot server
-- **Docker** – Containerized deployment
+- **PostgreSQL** – Database support
+- **Docker** (coming soon) – Containerized deployment
 
 ## Installation
-Look at [Prerequisites](#prerequisites) <br/>
 *(Coming Soon!)*
-
-**Compose containers from `docker-compose.yaml`**
-
-```bash
-    docker compose up -d
-```
 
 ### Prerequisites
 - Java 21+
 - Maven 3+
-- Docker, Docker Compose (For linux users)
+- (Optional) Docker for containerized deployment
 
 ### Steps to Run
 *(Coming Soon!)*
@@ -44,13 +36,11 @@ Look at [Prerequisites](#prerequisites) <br/>
 ## Disclaimer
 DayGuard is provided "as is" without any warranties. The author assumes no responsibility for any issues, damages, or data loss resulting from the use of this software.
 
-## Future Plans (Sorted by priority)
+## Future Plans
 - Implement online website for front-end
-- Implement account functionality
-- Support for group messaging
-- Support private messaging
-- Advanced encryption options
 - Implement mobile and web clients
+- Support for group messaging
+- Advanced encryption options
 - Push notifications
 
 ---
