@@ -5,13 +5,19 @@ COPY pom.xml app/pom.xml
 
 WORKDIR /app
 
-### Update the system
-RUN dnf update -y
+### Update the system and install dependencies
+RUN dnf update -y && \
+    curl -sL https://rpm.nodesource.com/setup_22.x | bash - && \
+    dnf install -y nodejs
 
 ### Compile the project
 RUN \
     mvn clean package -DskipTests && \
     chmod +x target/DayGuard-*.jar && \
-    mv target/DayGuard-*.jar target/DayGuard.jar
+    mv target/DayGuard-*.jar target/DayGuard.jar && \
+    cd src/main/resources/static && \
+    npm install && \
+    npx vite build
+
 
 CMD [ "java", "-jar", "target/DayGuard.jar" ]
