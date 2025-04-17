@@ -18,6 +18,7 @@ DayGuard is a secure and privacy-focused communication platform built with Sprin
 - **Spring Data JDBC** – Simplifies database interactions
 - **PostgreSQL** – Database support (Comming soon !)
 - **Nginx** - Used for enabling HTTPS by using reverse proxy to the Spring-boot server
+- **RabbitMQ** - Used for handling queues of the messages
 - **Docker** – Containerized deployment
 
 ## Installation
@@ -45,7 +46,7 @@ Look at [Prerequisites](#prerequisites) <br/>
 DayGuard is provided "as is" without any warranties. The author assumes no responsibility for any issues, damages, or data loss resulting from the use of this software.
 
 ## Future Plans (Sorted by priority)
-- Implement online website for front-end
+- Implement online website for front-end (Current frontend styling is written by AI, but this is only temporary)
 - Implement account functionality
 - Support for group messaging
 - Support private messaging
