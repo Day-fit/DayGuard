@@ -31,7 +31,7 @@ public class WebsocketEventListener {
             return;
         }
 
-        log.warn("User tired connect with empty username");
+        log.warn("User tried to connect with empty username");
     }
 
     @EventListener
