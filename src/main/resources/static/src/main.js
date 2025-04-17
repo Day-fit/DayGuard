@@ -15,7 +15,7 @@ document.querySelector("button.btn").addEventListener("click", event => {
     }
 
     // Create a fresh SockJS connection each time
-    const socket = new SockJS('http://localhost:8080/ws', null, {
+    const socket = new SockJS('/ws', null, {
         withCredentials: true
     });
 
