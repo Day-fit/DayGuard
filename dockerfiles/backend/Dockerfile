@@ -10,14 +10,18 @@ RUN dnf update -y && \
     curl -sL https://rpm.nodesource.com/setup_22.x | bash - && \
     dnf install -y nodejs
 
+RUN cd src/main/resources/static && \
+    npm install && \
+    npx vite build && \
+    mkdir -p assets && \
+    cp -r dist/assets/* assets/ && \
+    cp dist/index.html ./index.html
+
 ### Compile the project
 RUN \
     mvn clean package -DskipTests && \
     chmod +x target/DayGuard-*.jar && \
-    mv target/DayGuard-*.jar target/DayGuard.jar && \
-    cd src/main/resources/static && \
-    npm install && \
-    npx vite build && \
-    cp -r dist/* /
+    mv target/DayGuard-*.jar target/DayGuard.jar
+
 
 CMD [ "java", "-jar", "target/DayGuard.jar" ]
