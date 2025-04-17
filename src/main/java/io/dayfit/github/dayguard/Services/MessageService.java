@@ -16,17 +16,23 @@ public class MessageService {
 
     public void publishMessage(RabbitMessage message) throws IllegalArgumentException
     {
-        if (message.getReceiver() == null || mqManager.getUser(message.getReceiver()) == null)
+        if (message.getReceiver() != null)
         {
-            throw new IllegalArgumentException("Receiver is null!");
+
+            UserMQ receiver = mqManager.getUser(message.getReceiver());
+
+            if (receiver != null)
+            {
+                rabbitTemplate.convertAndSend(
+                        receiver.getExchange().getName(),
+                        receiver.getRoutingKey(),
+                        message
+                );
+
+                return;
+            }
         }
 
-        UserMQ receiver = mqManager.getUser(message.getReceiver());
-
-        rabbitTemplate.convertAndSend(
-                receiver.getExchange().getName(),
-                receiver.getRoutingKey(),
-                message
-        );
+        throw new IllegalArgumentException("Receiver is null!");
     }
 }

@@ -1,6 +1,6 @@
 package io.dayfit.github.dayguard.Interceptors;
 
-import io.dayfit.github.dayguard.POJOs.StompPrinciple;
+import io.dayfit.github.dayguard.POJOs.StompPrincipal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -26,7 +26,7 @@ public class WebSocketInterceptor implements ChannelInterceptor {
 
             if(username != null && !username.isEmpty())
             {
-                accessor.setUser(new StompPrinciple(username));
+                accessor.setUser(new StompPrincipal(username));
             }
 
             else
