@@ -18,6 +18,6 @@ RUN \
     cd src/main/resources/static && \
     npm install && \
     npx vite build && \
-    cp -r dist/* ../resources/static/
+    cp -r dist/* /
 
 CMD [ "java", "-jar", "target/DayGuard.jar" ]
