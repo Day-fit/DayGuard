@@ -1,10 +1,11 @@
 services:
   spring-backend:
     build:
-      context: ../../..
-      dockerfile: '../../../dockerfiles/backend/Dockerfile'
+      context: .
+      dockerfile: './dockerfiles/backend/Dockerfile'
     depends_on:
       - postgres
+      - rabbitmq
     profiles:
       - prod
 
