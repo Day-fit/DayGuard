@@ -37,3 +37,6 @@ ssl/**/*.pem
 
 ### Database data ###
 pgdata/
+
+### Enviroment ###
+.env
