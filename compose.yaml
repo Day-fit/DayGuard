@@ -1,8 +1,8 @@
 services:
   spring-backend:
     build:
-      context: .
-      dockerfile: 'dockerfiles/backend/Dockerfile'
+      context: ../../..
+      dockerfile: '../../../dockerfiles/backend/Dockerfile'
     depends_on:
       - postgres
     profiles:
@@ -49,16 +49,17 @@ services:
       - prod
 
   postgres-dev:
-    image: 'rapidfort/postgresql-official:17.4-alpine3.20'
+    image: postgres:15
     environment:
-      - 'POSTGRES_DB=dayguard'
-      - 'POSTGRES_PASSWORD=secret'
-      - 'POSTGRES_USER=myuser'
+      - POSTGRES_DB=dayguard
+      - POSTGRES_USER=myuser
+      - POSTGRES_PASSWORD=secret
     volumes:
       - ./pgdata-dev:/var/lib/postgresql/data
     ports:
-      - '5432:5432'
+      - "5432:5432"
     labels:
       org.springframework.boot.service-connection: postgres
+      org.springframework.boot.readiness-check.tcp.disable: false
     profiles:
       - dev
