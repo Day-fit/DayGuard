@@ -2,7 +2,7 @@ package io.dayfit.github.dayguard.Controllers;
 
 import io.dayfit.github.dayguard.POJOs.MessageType;
 import io.dayfit.github.dayguard.POJOs.RabbitMessage;
-import io.dayfit.github.dayguard.Services.MessageService;
+import io.dayfit.github.dayguard.Services.MessagingService;
 import lombok.AllArgsConstructor;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -18,7 +18,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class MessageController {
 
-    private final MessageService messageService;
+    private final MessagingService messagingService;
 
     @MessageMapping("/publish")
     public String publishMessage(@RequestBody RabbitMessage message, Message<?> rawMessage)
@@ -34,7 +34,7 @@ public class MessageController {
         message.setType(MessageType.MESSAGE);
 
         try {
-            messageService.publishMessage(message);
+            messagingService.publishMessage(message);
         } catch (IllegalArgumentException e)
         {
             return e.getMessage();

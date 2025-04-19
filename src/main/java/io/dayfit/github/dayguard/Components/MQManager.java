@@ -1,15 +1,16 @@
 package io.dayfit.github.dayguard.Components;
 
+import io.dayfit.github.dayguard.Events.ActivityEvent;
 import io.dayfit.github.dayguard.POJOs.ActivityMessage;
 import io.dayfit.github.dayguard.POJOs.MessageType;
 import io.dayfit.github.dayguard.POJOs.UserMQ;
-import io.dayfit.github.dayguard.Services.MessageService;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
@@ -23,7 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class MQManager {
     private final ConcurrentHashMap<String,UserMQ> usersMQ = new ConcurrentHashMap<>();
     private final RabbitAdmin rabbitAdmin;
-    private final MessageService messageService;
+    private final ApplicationEventPublisher eventPublisher;
     private final SimpMessagingTemplate messagingTemplate;
 
     private final @Getter TopicExchange usersActivityExchange = new TopicExchange("users.activity");
@@ -32,7 +33,12 @@ public class MQManager {
     @PostConstruct
     public void init()
     {
-        rabbitAdmin.declareExchange(usersActivityExchange);
+        try{
+            rabbitAdmin.declareExchange(usersActivityExchange);
+        } catch (Exception e)
+        {
+            log.error(e.getMessage());
+        }
     }
 
     public void addUser(String username)
@@ -76,13 +82,16 @@ public class MQManager {
             );
         }
 
-        messageService.publishActivity(
-                ActivityMessage.builder()
-                        .targetUsername(username)
-                        .messageId(UUID.randomUUID().toString())
-                        .date(new Date())
-                        .type(MessageType.JOIN)
-                        .build());
+        eventPublisher.publishEvent(
+                new ActivityEvent(
+                        ActivityMessage.builder()
+                                .targetUsername(username)
+                                .messageId(UUID.randomUUID().toString())
+                                .date(new Date())
+                                .type(MessageType.JOIN)
+                                .build()
+                )
+        );
 
         usersMQ.put(username,
                 UserMQ.builder()
@@ -107,13 +116,15 @@ public class MQManager {
 
             rabbitAdmin.deleteQueue(userToRemove.getQueueActivity().getName());
 
-            messageService.publishActivity(
-                    ActivityMessage.builder()
-                            .targetUsername(username)
-                            .messageId(UUID.randomUUID().toString())
-                            .date(new Date())
-                            .type(MessageType.LEAVE)
-                            .build()
+            eventPublisher.publishEvent(
+                    new ActivityEvent(
+                            ActivityMessage.builder()
+                                    .targetUsername(username)
+                                    .messageId(UUID.randomUUID().toString())
+                                    .date(new Date())
+                                    .type(MessageType.LEAVE)
+                                    .build()
+                    )
             );
             return;
         }
