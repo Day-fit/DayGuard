@@ -3,6 +3,17 @@ import SockJS from 'sockjs-client'
 
 let stompClient;
 let username;
+let selectedReceiver = '';
+let activeUsers = new Set();
+
+// Initialize sidebar functionality
+document.querySelector(".menu-btn")?.addEventListener("click", () => {
+    document.querySelector(".sidebar").classList.add("active");
+});
+
+document.querySelector(".close-sidebar")?.addEventListener("click", () => {
+    document.querySelector(".sidebar").classList.remove("active");
+});
 
 document.querySelector("button.btn").addEventListener("click", event => {
     event.preventDefault();
@@ -40,6 +51,11 @@ document.querySelector("button.btn").addEventListener("click", event => {
             stompClient.subscribe('/topic/public', message => {
                 displayMessage(JSON.parse(message.body));
             });
+
+            // Subscribe to activity channel for active users
+            stompClient.subscribe(`/user/${username}/queue/activities`, message => {
+                updateActiveUsers(JSON.parse(message.body));
+            });
         },
         onStompError: frame => console.error('STOMP error:', frame),
         onWebSocketError: (error) => {
@@ -70,15 +86,13 @@ document.querySelector("button.close-btn").addEventListener("click", event => {
         console.log("Disconnected from WebSocket");
 
         document.querySelector(".popup-overlay").style.display = "flex";
+        clearActiveUsers();
     }
 });
 
 function sendMessage() {
     const messageInput = document.querySelector("input#message");
-    const receiverInput = document.querySelector("input#receiver");
-
     const message = messageInput.value;
-    const receiver = receiverInput.value;
 
     if (!message || message.trim() === '') {
         return;
@@ -86,7 +100,7 @@ function sendMessage() {
 
     const chatMessage = {
         sender: username,
-        receiver: receiver,
+        receiver: selectedReceiver,
         message: message,
         type: "MESSAGE"
     };
@@ -96,7 +110,7 @@ function sendMessage() {
         body: JSON.stringify(chatMessage)
     });
 
-    if (receiver.trim() !== '') {
+    if (selectedReceiver.trim() !== '') {
         displayMessage({...chatMessage, fromMe: true});
     }
 
@@ -125,5 +139,70 @@ function displayMessage(message) {
     `;
 
     messageArea.appendChild(messageElement);
+    messageArea.scrollTop = messageArea.scrollHeight;
+}
+
+function updateActiveUsers(data) {
+    if (data.type === "ACTIVE_USERS") {
+        activeUsers = new Set(data.users);
+        renderUsersList();
+    } else if (data.type === "USER_JOINED") {
+        activeUsers.add(data.user);
+        renderUsersList();
+        displayStatusMessage(`${data.user} has joined the chat`);
+    } else if (data.type === "USER_LEFT") {
+        activeUsers.delete(data.user);
+        renderUsersList();
+        displayStatusMessage(`${data.user} has left the chat`);
+    }
+}
+
+function renderUsersList() {
+    const usersList = document.querySelector(".users-list");
+    usersList.innerHTML = '';
+
+    activeUsers.forEach(user => {
+        if (user !== username) {
+            const userItem = document.createElement("div");
+            userItem.classList.add("user-item");
+            if (user === selectedReceiver) {
+                userItem.classList.add("selected");
+            }
+
+            const initials = user.charAt(0).toUpperCase();
+
+            userItem.innerHTML = `
+                <div class="user-avatar">${initials}</div>
+                <span>${user}</span>
+            `;
+
+            userItem.addEventListener("click", () => {
+                selectedReceiver = user;
+                document.querySelectorAll(".user-item").forEach(item => {
+                    item.classList.remove("selected");
+                });
+                userItem.classList.add("selected");
+                displayStatusMessage(`Now chatting with ${user}`);
+                document.querySelector(".sidebar").classList.remove("active");
+            });
+
+            usersList.appendChild(userItem);
+        }
+    });
+}
+
+function clearActiveUsers() {
+    activeUsers = new Set();
+    selectedReceiver = '';
+    document.querySelector(".users-list").innerHTML = '';
+}
+
+function displayStatusMessage(text) {
+    const messageArea = document.querySelector(".message-area");
+    const statusElement = document.createElement("div");
+    statusElement.classList.add("status-message");
+    statusElement.textContent = text;
+
+    messageArea.appendChild(statusElement);
     messageArea.scrollTop = messageArea.scrollHeight;
 }

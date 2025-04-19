@@ -11,8 +11,10 @@ import org.springframework.amqp.core.TopicExchange;
 public class UserMQ {
     private String username;
 
-    private TopicExchange exchange;
-    private Queue queue;
-    private String routingKey;
-    private Binding binding;
+    private TopicExchange exchangePM;
+    private Queue queuePM;
+    private String routingKeyPM;
+    private Binding bindingPM;
+
+    private Queue queueActivity;
 }

@@ -32,4 +32,6 @@ public class MQConfiguration {
         rabbitAdmin.initialize();
         return rabbitAdmin;
     }
+
+
 }

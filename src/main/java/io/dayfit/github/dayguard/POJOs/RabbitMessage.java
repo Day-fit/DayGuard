@@ -1,24 +1,14 @@
 package io.dayfit.github.dayguard.POJOs;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import lombok.*;
 
-import java.util.Date;
-
-@Data
+@Setter
+@Getter
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
-public class RabbitMessage {
-    private String messageId;
+public class RabbitMessage extends Message {
     private String message;
-
     private String sender;
     private String receiver;
-
-    private Date date;
-
-    private MessageType type;
 }

@@ -1,6 +1,7 @@
 package io.dayfit.github.dayguard.Services;
 
 import io.dayfit.github.dayguard.Components.MQManager;
+import io.dayfit.github.dayguard.POJOs.ActivityMessage;
 import io.dayfit.github.dayguard.POJOs.RabbitMessage;
 import io.dayfit.github.dayguard.POJOs.UserMQ;
 import lombok.RequiredArgsConstructor;
@@ -24,8 +25,8 @@ public class MessageService {
             if (receiver != null)
             {
                 rabbitTemplate.convertAndSend(
-                        receiver.getExchange().getName(),
-                        receiver.getRoutingKey(),
+                        receiver.getExchangePM().getName(),
+                        receiver.getRoutingKeyPM(),
                         message
                 );
 
@@ -34,5 +35,15 @@ public class MessageService {
         }
 
         throw new IllegalArgumentException("Receiver is null!");
+    }
+
+
+    public void publishActivity(ActivityMessage message)
+    {
+        rabbitTemplate.convertAndSend(
+                mqManager.getUsersActivityExchange().getName(),
+                mqManager.getROUTING_KEY(),
+                message
+        );
     }
 }

@@ -19,7 +19,7 @@ public class WebsocketEventListener {
     private final DynamicMessageListenerManager listenerManager;
 
     @EventListener
-    public void handleSessionConnect(SessionConnectEvent event)
+    public void handleWebSocketConnect(SessionConnectEvent event)
     {
         String username = getUsername(event);
 
@@ -27,7 +27,7 @@ public class WebsocketEventListener {
         {
             log.info("User connected with username of {}", username);
             mqManager.addUser(username);
-            listenerManager.registerMessageListener(username, username + ".queue");
+            listenerManager.registerListeners(username, username + ".queue", username);
             return;
         }
 
@@ -35,7 +35,7 @@ public class WebsocketEventListener {
     }
 
     @EventListener
-    public void handleWebsocketDisconnect(SessionDisconnectEvent event)
+    public void handleWebSocketDisconnect(SessionDisconnectEvent event)
     {
         String username = getUsername(event);
 
