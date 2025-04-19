@@ -1,5 +1,6 @@
 package io.dayfit.github.dayguard.Controllers;
 
+import io.dayfit.github.dayguard.POJOs.MessageType;
 import io.dayfit.github.dayguard.POJOs.RabbitMessage;
 import io.dayfit.github.dayguard.Services.MessageService;
 import lombok.AllArgsConstructor;
@@ -30,6 +31,7 @@ public class MessageController {
         message.setMessageId(UUID.randomUUID().toString());
         message.setSender(username);
         message.setDate(new Date());
+        message.setType(MessageType.MESSAGE);
 
         try {
             messageService.publishMessage(message);
