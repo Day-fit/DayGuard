@@ -11,7 +11,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 @RequiredArgsConstructor
@@ -19,7 +19,7 @@ public class DynamicMessageListenerManager {
 
     private final ConnectionFactory connectionFactory;
     private final SimpMessagingTemplate template;
-    private final HashMap<String, ArrayList<SimpleMessageListenerContainer>> listeners = new HashMap<>();
+    private final ConcurrentHashMap<String, ArrayList<SimpleMessageListenerContainer>> listeners = new ConcurrentHashMap<>();
 
     public void registerListeners(String username, String messageQueueName, String activityQueueName)
     {

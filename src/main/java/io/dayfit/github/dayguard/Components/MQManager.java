@@ -10,19 +10,21 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
-import java.util.HashMap;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class MQManager {
-    private final HashMap<String,UserMQ> usersMQ = new HashMap<>();
+    private final ConcurrentHashMap<String,UserMQ> usersMQ = new ConcurrentHashMap<>();
     private final RabbitAdmin rabbitAdmin;
     private final MessageService messageService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     private final @Getter TopicExchange usersActivityExchange = new TopicExchange("users.activity");
     private final @Getter String ROUTING_KEY = "users.*";
@@ -35,19 +37,26 @@ public class MQManager {
 
     public void addUser(String username)
     {
+        if(usersMQ.containsKey(username))
+        {
+            log.warn("User already exists with name {}",username);
+            return;
+        }
+
         TopicExchange exchangePM = new TopicExchange(username+".exchangePM");
         Queue queuePM = new Queue(username+".queuePM");
-        String routingKey = username+".routing.key";
+        String routingKeyPM = username+".routing.key";
+        Binding bindingPM = BindingBuilder
+                .bind(queuePM)
+                .to(exchangePM)
+                .with(routingKeyPM);
 
         Queue queueActivity = new Queue(username+".queue.activity");
         String routingKeyActivity = username+".routing.key.activity";
 
         rabbitAdmin.declareQueue(queuePM);
         rabbitAdmin.declareExchange(exchangePM);
-        rabbitAdmin.declareBinding(BindingBuilder
-                .bind(queuePM)
-                .to(exchangePM)
-                .with(routingKey));
+        rabbitAdmin.declareBinding(bindingPM);
 
         rabbitAdmin.declareQueue(queueActivity);
         rabbitAdmin.declareBinding(BindingBuilder
@@ -55,22 +64,17 @@ public class MQManager {
                 .to(usersActivityExchange)
                 .with(routingKeyActivity));
 
-        usersMQ.put(username,
-                UserMQ.builder()
-                        .username(username)
-                        .exchangePM(exchangePM)
-                        .queuePM(queuePM)
-                        .routingKeyPM(routingKey)
-                        .bindingPM(
-                                BindingBuilder
-                                        .bind(queuePM)
-                                        .to(exchangePM)
-                                        .with(routingKey)
-                        )
-                        .build()
-        );
-
-
+        for(String activeUser : usersMQ.keySet())
+        {
+            messagingTemplate.convertAndSend("/user/"+username+"/queue/activities",
+                    ActivityMessage.builder()
+                            .targetUsername(activeUser)
+                            .messageId(UUID.randomUUID().toString())
+                            .date(new Date())
+                            .type(MessageType.JOIN)
+                            .build()
+            );
+        }
 
         messageService.publishActivity(
                 ActivityMessage.builder()
@@ -79,16 +83,29 @@ public class MQManager {
                         .date(new Date())
                         .type(MessageType.JOIN)
                         .build());
+
+        usersMQ.put(username,
+                UserMQ.builder()
+                        .username(username)
+                        .exchangePM(exchangePM)
+                        .queuePM(queuePM)
+                        .queueActivity(queueActivity)
+                        .routingKeyPM(routingKeyPM)
+                        .bindingPM(bindingPM)
+                        .build()
+        );
     }
 
     public void removeUser(String username)
     {
         if(usersMQ.containsKey(username))
         {
-            rabbitAdmin.deleteQueue(username+".queue");
-            rabbitAdmin.deleteExchange(username+".exchange");
+            UserMQ userToRemove = usersMQ.remove(username);
 
-            usersMQ.remove(username);
+            rabbitAdmin.deleteQueue(userToRemove.getQueuePM().getName());
+            rabbitAdmin.deleteExchange(userToRemove.getExchangePM().getName());
+
+            rabbitAdmin.deleteQueue(userToRemove.getQueueActivity().getName());
 
             messageService.publishActivity(
                     ActivityMessage.builder()
