@@ -1,42 +1,52 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Application</title>
-    <link rel="stylesheet" href="/src/style.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/boxicons@latest/css/boxicons.min.css">
-  </head>
-  <body>
-  <!-- Username Popup -->
-  <div class="popup-overlay">
-    <div class="popup">
-      <h2>Welcome to Chat</h2>
-      <p>Please enter your username to continue</p>
-      <div class="form-group">
-        <label for="username"></label><input type="text" id="username" placeholder="Username" required>
-        <button class="btn">Continue</button>
-      </div>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Application</title>
+  <link rel="stylesheet" href="/src/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/boxicons@latest/css/boxicons.min.css">
+</head>
+<body>
+<!-- Username Popup -->
+<div class="popup-overlay">
+  <div class="popup">
+    <h2>Welcome to Chat</h2>
+    <p>Please enter your username to continue</p>
+    <div class="form-group">
+      <label for="username"></label><input type="text" id="username" placeholder="Username" required>
+      <button class="btn">Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- Main Chat Screen -->
+<div class="chat-container">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>Active Users</h2>
+      <button class="close-sidebar"><i class="bx bx-x"></i></button>
+    </div>
+    <div class="users-list">
+      <!-- Active users will appear here -->
     </div>
   </div>
 
-  <!-- Main Chat Screen -->
-  <div class="chat-container">
-    <header>
-      <h1>DayGuard</h1>
-    </header>
+  <header>
+    <button class="menu-btn"><i class="bx bx-menu"></i></button>
+    <h1>DayGuard</h1>
+  </header>
 
-    <main class="message-area">
-      <!-- Messages would appear here -->
-    </main>
+  <main class="message-area">
+    <!-- Messages would appear here -->
+  </main>
 
-    <footer class="message-form">
-      <label for="receiver"></label><input type="text" id="receiver" placeholder="Receiver">
-      <label for="message"></label><input type="text" id="message" placeholder="Type your message here...">
-      <button class="send-btn"><i class="bx bx-send"></i>Send</button>
-      <button class="close-btn"><i class="bx bx-log-out"></i>Close Connection</button>
-    </footer>
-  </div>
-  </body>
-  <script src="./src/main.js" type="module"></script>
+  <footer class="message-form">
+    <label for="message"></label><input type="text" id="message" placeholder="Type your message here...">
+    <button class="send-btn"><i class="bx bx-send"></i>Send</button>
+    <button class="close-btn"><i class="bx bx-log-out"></i>Close Connection</button>
+  </footer>
+</div>
+</body>
+<script src="./src/main.js" type="module"></script>
 </html>
