@@ -27,7 +27,7 @@ public class WebsocketEventListener {
         {
             log.info("User connected with username of {}", username);
             mqManager.addUser(username);
-            listenerManager.registerListeners(username, username + ".queue", username);
+            listenerManager.registerListeners(username, username + ".queuePM", username + ".queue.activity");
             return;
         }
 

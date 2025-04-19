@@ -37,8 +37,8 @@ services:
     image: 'rabbitmq:4.1.0-alpine'
 
     environment:
-      - 'RABBIT_DEFAULT_USER=${RABBIT_USER}'
-      - 'RABBIT_DEFAULT_PASS=${RABBIT_PASSWORD}'
+      - 'RABBITMQ_DEFAULT_USER=${RABBIT_USER}'
+      - 'RABBITMQ_DEFAULT_PASS=${RABBIT_PASSWORD}'
 
     profiles:
       - prod
