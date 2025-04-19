@@ -16,6 +16,7 @@ services:
       - 'ALLOWED_ORIGINS=${ALLOWED_ORIGINS}'
     profiles:
       - prod
+      - nginx-free
 
   nginx:
     image: 'rapidfort/nginx-official:1.25.5-alpine3.19-perl'
@@ -38,6 +39,7 @@ services:
 
     profiles:
       - prod
+      - nginx-free
 
   rabbitmq-dev:
     image: 'rabbitmq:4.1.0-management-alpine'
@@ -61,6 +63,7 @@ services:
     ### Uncomment the above lines to expose the database to the outside world (NOT RECOMMENDED)
     profiles:
       - prod
+      - nginx-free
 
   postgres-dev:
     image: postgres:15
