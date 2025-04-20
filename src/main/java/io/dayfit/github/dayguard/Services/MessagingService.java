@@ -1,6 +1,5 @@
 package io.dayfit.github.dayguard.Services;
 
-import io.dayfit.github.dayguard.Components.MQManager;
 import io.dayfit.github.dayguard.POJOs.RabbitMessage;
 import io.dayfit.github.dayguard.POJOs.UserMQ;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +10,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class MessagingService {
 
-    private final MQManager mqManager;
+    private final MQService mqService;
     private final RabbitTemplate rabbitTemplate;
 
     public void publishMessage(RabbitMessage message) throws IllegalArgumentException
@@ -19,7 +18,7 @@ public class MessagingService {
         if (message.getReceiver() != null)
         {
 
-            UserMQ receiver = mqManager.getUser(message.getReceiver());
+            UserMQ receiver = mqService.getUser(message.getReceiver());
 
             if (receiver != null)
             {

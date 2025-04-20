@@ -1,5 +1,5 @@
-import { Client } from '@stomp/stompjs'
-import SockJS from 'sockjs-client'
+import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 
 let stompClient;
 let username;
@@ -18,52 +18,13 @@ document.querySelector(".close-sidebar")?.addEventListener("click", () => {
 document.querySelector("button.btn").addEventListener("click", event => {
     event.preventDefault();
 
-    username = document.querySelector("input#username").value;
-
-    if (!username || username.trim() === '') {
+    username = document.querySelector("input#username").value.trim();
+    if (!username) {
         alert("Please enter a username");
         return;
     }
 
-    // Create a fresh SockJS connection each time
-    const socket = new SockJS('/ws', null, {
-        withCredentials: true
-    });
-
-    stompClient = new Client({
-        webSocketFactory: () => socket,
-        connectHeaders: {
-            username: username
-        },
-        debug: function(str) {
-            console.log('STOMP: ' + str);
-        },
-        onConnect: () => {
-            console.log('STOMP connected as', username);
-            document.querySelector(".popup-overlay").style.display = "none";
-
-            // Subscribe to personal channel
-            stompClient.subscribe(`/user/${username}/queue/messages`, message => {
-                displayMessage(JSON.parse(message.body));
-            });
-
-            // Subscribe to public channel
-            stompClient.subscribe('/topic/public', message => {
-                displayMessage(JSON.parse(message.body));
-            });
-
-            // Subscribe to activity channel for active users
-            stompClient.subscribe(`/user/${username}/queue/activities`, message => {
-                updateActiveUsers(JSON.parse(message.body));
-            });
-        },
-        onStompError: frame => console.error('STOMP error:', frame),
-        onWebSocketError: (error) => {
-            console.error('WebSocket error:', error);
-        }
-    });
-
-    stompClient.activate();
+    initializeWebSocketConnection(username);
 });
 
 document.querySelector("button.send-btn").addEventListener("click", event => {
@@ -80,40 +41,76 @@ document.querySelector("input#message").addEventListener("keypress", event => {
 
 document.querySelector("button.close-btn").addEventListener("click", event => {
     event.preventDefault();
-
-    if (stompClient) {
-        stompClient.deactivate();
-        console.log("Disconnected from WebSocket");
-
-        document.querySelector(".popup-overlay").style.display = "flex";
-        clearActiveUsers();
-    }
+    disconnectWebSocket();
 });
+
+function initializeWebSocketConnection(username) {
+    const socket = new SockJS('/ws', null, { withCredentials: true });
+
+    stompClient = new Client({
+        webSocketFactory: () => socket,
+        connectHeaders: { username },
+        onConnect: () => {
+            document.querySelector(".popup-overlay").style.display = "none";
+
+            stompClient.subscribe(`/user/${username}/queue/messages`, message => {
+                try {
+                    displayMessage(JSON.parse(message.body));
+                } catch (e) {
+                    // Silent error handling
+                }
+            });
+
+            stompClient.subscribe('/topic/public', () => {});
+
+            stompClient.subscribe(`/user/${username}/queue/activities`, message => {
+                try {
+                    const data = JSON.parse(message.body);
+                    updateActiveUsers(data);
+                } catch (e) {
+                    // Silent error handling
+                }
+            });
+
+            // Send connection-ready with headers
+            stompClient.publish({
+                destination: '/app/connection-ready',
+                body: JSON.stringify({}),
+                headers: { 'content-type': 'application/json' }
+            });
+        },
+        onWebSocketError: () => {
+            alert('Failed to connect to WebSocket server. Please try again.');
+        },
+    });
+
+    try {
+        stompClient.activate();
+    } catch (error) {
+        alert('Failed to initialize WebSocket connection.');
+    }
+}
 
 function sendMessage() {
     const messageInput = document.querySelector("input#message");
-    const message = messageInput.value;
+    const message = messageInput.value.trim();
 
-    if (!message || message.trim() === '') {
-        return;
-    }
+    if (!message || !selectedReceiver) return;
 
     const chatMessage = {
         sender: username,
         receiver: selectedReceiver,
-        message: message,
-        type: "MESSAGE"
+        message,
+        type: "MESSAGE",
     };
 
     stompClient.publish({
         destination: '/app/publish',
-        body: JSON.stringify(chatMessage)
+        body: JSON.stringify(chatMessage),
+        headers: { 'content-type': 'application/json' }
     });
 
-    if (selectedReceiver.trim() !== '') {
-        displayMessage({...chatMessage, fromMe: true});
-    }
-
+    displayMessage({ ...chatMessage, fromMe: true });
     messageInput.value = '';
 }
 
@@ -121,14 +118,10 @@ function displayMessage(message) {
     const messageArea = document.querySelector(".message-area");
     const messageElement = document.createElement("div");
 
-    messageElement.classList.add("message");
-    if (message.sender === username || message.fromMe) {
-        messageElement.classList.add("own-message");
-    } else {
-        messageElement.classList.add("other-message");
-    }
+    messageElement.classList.add("message", message.sender === username || message.fromMe ? "own-message" : "other-message");
 
-    const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    const time = message.date ? new Date(message.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     messageElement.innerHTML = `
         <div class="message-header">
@@ -143,17 +136,35 @@ function displayMessage(message) {
 }
 
 function updateActiveUsers(data) {
-    if (data.type === "ACTIVE_USERS") {
-        activeUsers = new Set(data.users);
-        renderUsersList();
-    } else if (data.type === "USER_JOINED") {
-        activeUsers.add(data.user);
-        renderUsersList();
-        displayStatusMessage(`${data.user} has joined the chat`);
-    } else if (data.type === "USER_LEFT") {
-        activeUsers.delete(data.user);
-        renderUsersList();
-        displayStatusMessage(`${data.user} has left the chat`);
+    if (!data) return;
+
+    switch (data.type) {
+        case "ACTIVE_USERS_LIST":
+            if (Array.isArray(data.targetUsernames)) {
+                activeUsers = new Set(data.targetUsernames.filter(user => user && user.trim() !== ''));
+                renderUsersList();
+            }
+            break;
+        case "JOIN":
+            if (data.targetUsername && data.targetUsername.trim() !== '') {
+                activeUsers.add(data.targetUsername);
+                renderUsersList();
+                displayStatusMessage(`${data.targetUsername} has joined the chat`);
+            }
+            break;
+        case "LEAVE":
+            if (data.targetUsername) {
+                activeUsers.delete(data.targetUsername);
+                renderUsersList();
+                displayStatusMessage(`${data.targetUsername} has left the chat`);
+
+                // If the user we were chatting with left, clear the selected receiver
+                if (data.targetUsername === selectedReceiver) {
+                    selectedReceiver = '';
+                    displayStatusMessage(`${data.targetUsername} has left the chat. Please select another user to chat with.`);
+                }
+            }
+            break;
     }
 }
 
@@ -161,38 +172,55 @@ function renderUsersList() {
     const usersList = document.querySelector(".users-list");
     usersList.innerHTML = '';
 
-    activeUsers.forEach(user => {
-        if (user !== username) {
-            const userItem = document.createElement("div");
-            userItem.classList.add("user-item");
-            if (user === selectedReceiver) {
-                userItem.classList.add("selected");
-            }
+    const filteredUsers = Array.from(activeUsers)
+        .filter(user => user && user.trim() !== '' && user !== username);
 
-            const initials = user.charAt(0).toUpperCase();
+    if (filteredUsers.length === 0) {
+        const emptyMessage = document.createElement("div");
+        emptyMessage.classList.add("empty-users-message");
+        emptyMessage.textContent = "No active users";
+        usersList.appendChild(emptyMessage);
+        return;
+    }
 
-            userItem.innerHTML = `
-                <div class="user-avatar">${initials}</div>
-                <span>${user}</span>
-            `;
+    filteredUsers.forEach(user => {
+        const userItem = document.createElement("div");
+        userItem.classList.add("user-item");
 
-            userItem.addEventListener("click", () => {
-                selectedReceiver = user;
-                document.querySelectorAll(".user-item").forEach(item => {
-                    item.classList.remove("selected");
-                });
-                userItem.classList.add("selected");
-                displayStatusMessage(`Now chatting with ${user}`);
-                document.querySelector(".sidebar").classList.remove("active");
-            });
-
-            usersList.appendChild(userItem);
+        if (user === selectedReceiver) {
+            userItem.classList.add("selected");
         }
+
+        const initials = user.charAt(0).toUpperCase();
+
+        userItem.innerHTML = `
+            <div class="user-avatar">${initials}</div>
+            <span>${user}</span>
+        `;
+
+        userItem.addEventListener("click", () => {
+            selectedReceiver = user;
+            document.querySelectorAll(".user-item").forEach(item => item.classList.remove("selected"));
+            userItem.classList.add("selected");
+            displayStatusMessage(`Now chatting with ${user}`);
+            document.querySelector(".sidebar").classList.remove("active");
+        });
+
+        usersList.appendChild(userItem);
     });
 }
 
+function disconnectWebSocket() {
+    if (!stompClient) return;
+
+    stompClient.deactivate();
+
+    document.querySelector(".popup-overlay").style.display = "flex";
+    clearActiveUsers();
+}
+
 function clearActiveUsers() {
-    activeUsers = new Set();
+    activeUsers.clear();
     selectedReceiver = '';
     document.querySelector(".users-list").innerHTML = '';
 }
