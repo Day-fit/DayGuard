@@ -3,6 +3,8 @@ package io.dayfit.github.dayguard.POJOs;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
+import java.util.List;
+
 @Getter
 @Setter
 @AllArgsConstructor
@@ -10,5 +12,6 @@ import lombok.experimental.SuperBuilder;
 @ToString
 @SuperBuilder
 public class ActivityMessage extends Message {
-    String targetUsername;
+    private String targetUsername;
+    private List<String> targetUsernames;
 }

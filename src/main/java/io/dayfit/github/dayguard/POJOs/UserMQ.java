@@ -17,4 +17,5 @@ public class UserMQ {
     private Binding bindingPM;
 
     private Queue queueActivity;
+    private String routingKeyActivity;
 }
