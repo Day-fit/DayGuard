@@ -368,6 +368,15 @@ header h1 {
     }
 }
 
+.unread-indicator {
+    width: 8px;
+    height: 8px;
+    background-color: var(--primary);
+    border-radius: 50%;
+    display: inline-block;
+    margin-left: auto;
+}
+
 /* Improve responsiveness */
 @media (max-width: 768px) {
     .message {
