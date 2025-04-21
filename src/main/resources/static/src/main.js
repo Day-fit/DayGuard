@@ -6,6 +6,9 @@ let username;
 let selectedReceiver = '';
 let activeUsers = new Set();
 
+let userMessages = {};
+let unreadCounts = {};
+
 // Initialize sidebar functionality
 document.querySelector(".menu-btn")?.addEventListener("click", () => {
     document.querySelector(".sidebar").classList.add("active");
@@ -55,7 +58,14 @@ function initializeWebSocketConnection(username) {
 
             stompClient.subscribe(`/user/${username}/queue/messages`, message => {
                 try {
-                    displayMessage(JSON.parse(message.body));
+                    const messageData = JSON.parse(message.body);
+                    storeMessage(messageData);
+                    if (messageData.sender === selectedReceiver) {
+                        displayMessage(messageData);
+                    } else {
+                        incrementUnreadCount(messageData.sender);
+                        renderUsersList();
+                    }
                 } catch (e) {
                     // Silent error handling
                 }
@@ -110,8 +120,27 @@ function sendMessage() {
         headers: { 'content-type': 'application/json' }
     });
 
-    displayMessage({ ...chatMessage, fromMe: true });
+    const outgoingMessage = { ...chatMessage, fromMe: true };
+    storeMessage(outgoingMessage);
+    displayMessage(outgoingMessage);
     messageInput.value = '';
+}
+
+function storeMessage(message) {
+    const otherUser = message.fromMe || message.sender === username ? message.receiver : message.sender;
+
+    if (!userMessages[otherUser]) {
+        userMessages[otherUser] = [];
+    }
+
+    userMessages[otherUser].push(message);
+}
+
+function incrementUnreadCount(sender) {
+    if (!unreadCounts[sender]) {
+        unreadCounts[sender] = 0;
+    }
+    unreadCounts[sender]++;
 }
 
 function displayMessage(message) {
@@ -133,6 +162,17 @@ function displayMessage(message) {
 
     messageArea.appendChild(messageElement);
     messageArea.scrollTop = messageArea.scrollHeight;
+}
+
+function loadUserMessages(user) {
+    const messageArea = document.querySelector(".message-area");
+    messageArea.innerHTML = '';
+
+    if (userMessages[user]) {
+        userMessages[user].forEach(msg => {
+            displayMessage(msg);
+        });
+    }
 }
 
 function updateActiveUsers(data) {
@@ -158,7 +198,6 @@ function updateActiveUsers(data) {
                 renderUsersList();
                 displayStatusMessage(`${data.targetUsername} has left the chat`);
 
-                // If the user we were chatting with left, clear the selected receiver
                 if (data.targetUsername === selectedReceiver) {
                     selectedReceiver = '';
                     displayStatusMessage(`${data.targetUsername} has left the chat. Please select another user to chat with.`);
@@ -192,18 +231,28 @@ function renderUsersList() {
         }
 
         const initials = user.charAt(0).toUpperCase();
+        const hasUnread = unreadCounts[user] && unreadCounts[user] > 0;
 
         userItem.innerHTML = `
             <div class="user-avatar">${initials}</div>
             <span>${user}</span>
+            ${hasUnread ? `<span class="unread-indicator"></span>` : ''}
         `;
 
         userItem.addEventListener("click", () => {
             selectedReceiver = user;
             document.querySelectorAll(".user-item").forEach(item => item.classList.remove("selected"));
             userItem.classList.add("selected");
+
+            // Clear unread count
+            unreadCounts[user] = 0;
+
+            // Load messages for this user
+            loadUserMessages(user);
+
             displayStatusMessage(`Now chatting with ${user}`);
             document.querySelector(".sidebar").classList.remove("active");
+            renderUsersList();
         });
 
         usersList.appendChild(userItem);
@@ -222,7 +271,10 @@ function disconnectWebSocket() {
 function clearActiveUsers() {
     activeUsers.clear();
     selectedReceiver = '';
+    userMessages = {};
+    unreadCounts = {};
     document.querySelector(".users-list").innerHTML = '';
+    document.querySelector(".message-area").innerHTML = '';
 }
 
 function displayStatusMessage(text) {
