@@ -1,4 +1,4 @@
-package io.dayfit.github.dayguard.POJOs;
+package io.dayfit.github.dayguard.POJOs.MQ;
 
 import lombok.AllArgsConstructor;
 

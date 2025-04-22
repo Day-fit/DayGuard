@@ -1,9 +1,9 @@
 package io.dayfit.github.dayguard.Services;
 
 import io.dayfit.github.dayguard.Events.ActivityEvent;
-import io.dayfit.github.dayguard.POJOs.ActivityMessage;
-import io.dayfit.github.dayguard.POJOs.MessageType;
-import io.dayfit.github.dayguard.POJOs.UserMQ;
+import io.dayfit.github.dayguard.POJOs.Messages.ActivityMessage;
+import io.dayfit.github.dayguard.POJOs.Messages.MessageType;
+import io.dayfit.github.dayguard.POJOs.MQ.UserMQ;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

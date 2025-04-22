@@ -1,8 +1,9 @@
-package io.dayfit.github.dayguard.POJOs;
+package io.dayfit.github.dayguard.POJOs.Messages;
 
 public enum MessageType {
 
-    MESSAGE,
+    TEXT_MESSAGE,
+    MESSAGE_WITH_ATTACHMENT,
 
     //Activities related
     JOIN,
