@@ -32,7 +32,7 @@ public class MessageController {
         message.setSender(username);
         message.setDate(new Date());
 
-        MessageType messageType = (message.getAttachments() != null) ? MessageType.TEXT_MESSAGE : MessageType.MESSAGE_WITH_ATTACHMENT;
+        MessageType messageType = (message.getAttachments() != null) ? MessageType.MESSAGE_WITH_ATTACHMENT : MessageType.TEXT_MESSAGE;
         message.setType(messageType);
 
         try {
