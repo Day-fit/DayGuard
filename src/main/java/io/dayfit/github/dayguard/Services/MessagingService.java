@@ -1,7 +1,7 @@
 package io.dayfit.github.dayguard.Services;
 
-import io.dayfit.github.dayguard.POJOs.RabbitMessage;
-import io.dayfit.github.dayguard.POJOs.UserMQ;
+import io.dayfit.github.dayguard.POJOs.Messages.RabbitMessage;
+import io.dayfit.github.dayguard.POJOs.MQ.UserMQ;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;

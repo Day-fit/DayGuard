@@ -1,7 +1,7 @@
 package io.dayfit.github.dayguard.Controllers;
 
-import io.dayfit.github.dayguard.POJOs.MessageType;
-import io.dayfit.github.dayguard.POJOs.RabbitMessage;
+import io.dayfit.github.dayguard.POJOs.Messages.MessageType;
+import io.dayfit.github.dayguard.POJOs.Messages.RabbitMessage;
 import io.dayfit.github.dayguard.Services.MessagingService;
 import lombok.AllArgsConstructor;
 import org.springframework.messaging.Message;
@@ -31,7 +31,9 @@ public class MessageController {
         message.setMessageId(UUID.randomUUID().toString());
         message.setSender(username);
         message.setDate(new Date());
-        message.setType(MessageType.MESSAGE);
+
+        MessageType messageType = (message.getAttachments() != null) ? MessageType.MESSAGE_WITH_ATTACHMENT : MessageType.TEXT_MESSAGE;
+        message.setType(messageType);
 
         try {
             messagingService.publishMessage(message);

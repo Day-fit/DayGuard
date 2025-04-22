@@ -2,8 +2,8 @@ package io.dayfit.github.dayguard.EventListeners;
 
 import io.dayfit.github.dayguard.Services.MQService;
 import io.dayfit.github.dayguard.Events.ActivityEvent;
-import io.dayfit.github.dayguard.POJOs.ActivityMessage;
-import io.dayfit.github.dayguard.POJOs.UserMQ;
+import io.dayfit.github.dayguard.POJOs.Messages.ActivityMessage;
+import io.dayfit.github.dayguard.POJOs.MQ.UserMQ;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;

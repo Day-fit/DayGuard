@@ -1,15 +1,12 @@
-import { Client } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
+import ConnectionManager from './Classes/ConnectionManager.js';
 
-let stompClient;
-let username;
-let selectedReceiver = '';
-let activeUsers = new Set();
+const messageManager = new MessageManager();
+const userListManager = new UserListManager();
+const connectionManager = new ConnectionManager(messageManager, userListManager);
 
-let userMessages = {};
-let unreadCounts = {};
+userListManager.setMessageDisplay(messageManager);
+userListManager.setUpdateUICallback(updateUIForSelectedUser);
 
-// Initialize sidebar functionality
 document.querySelector(".menu-btn")?.addEventListener("click", () => {
     document.querySelector(".sidebar").classList.add("active");
 });
@@ -18,271 +15,133 @@ document.querySelector(".close-sidebar")?.addEventListener("click", () => {
     document.querySelector(".sidebar").classList.remove("active");
 });
 
+document.querySelector(".show-users-btn")?.addEventListener("click", () => {
+    document.querySelector(".sidebar").classList.add("active");
+});
+
+document.querySelector(".attachment-btn").addEventListener("click", () => {
+    document.getElementById("file-input").click();
+});
+
 document.querySelector("button.btn").addEventListener("click", event => {
     event.preventDefault();
 
-    username = document.querySelector("input#username").value.trim();
+    const username = document.querySelector("input#username").value.trim();
     if (!username) {
         alert("Please enter a username");
         return;
     }
 
-    initializeWebSocketConnection(username);
+    messageManager.setUsername(username);
+    userListManager.setUsername(username);
+    connectionManager.setUsername(username);
+    connectionManager.initializeWebSocketConnection();
 });
 
 document.querySelector("button.send-btn").addEventListener("click", event => {
     event.preventDefault();
-    sendMessage();
+    const messageInput = document.querySelector("input#message");
+    const message = messageInput.value.trim();
+
+    if (connectionManager.sendMessage(message)) {
+        messageInput.value = '';
+    }
 });
 
 document.querySelector("input#message").addEventListener("keypress", event => {
     if (event.key === "Enter") {
         event.preventDefault();
-        sendMessage();
+        const messageInput = document.querySelector("input#message");
+        const message = messageInput.value.trim();
+
+        if (connectionManager.sendMessage(message)) {
+            messageInput.value = '';
+        }
     }
 });
 
 document.querySelector("button.close-btn").addEventListener("click", event => {
     event.preventDefault();
-    disconnectWebSocket();
+    connectionManager.disconnect();
 });
 
-function initializeWebSocketConnection(username) {
-    const socket = new SockJS('/ws', null, { withCredentials: true });
+document.getElementById("file-input").addEventListener("change", (event) => {
+    if (event.target.files.length > 0) {
+        const attachmentPreview = createAttachmentPreview();
 
-    stompClient = new Client({
-        webSocketFactory: () => socket,
-        connectHeaders: { username },
-        onConnect: () => {
-            document.querySelector(".popup-overlay").style.display = "none";
+        Array.from(event.target.files).forEach(file => {
+            connectionManager.addAttachment(file);
 
-            stompClient.subscribe(`/user/${username}/queue/messages`, message => {
-                try {
-                    const messageData = JSON.parse(message.body);
-                    storeMessage(messageData);
-                    if (messageData.sender === selectedReceiver) {
-                        displayMessage(messageData);
-                    } else {
-                        incrementUnreadCount(messageData.sender);
-                        renderUsersList();
-                    }
-                } catch (e) {
-                    // Silent error handling
-                }
-            });
+            const fileElement = document.createElement('div');
+            fileElement.classList.add('file-item');
 
-            stompClient.subscribe('/topic/public', () => {});
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    fileElement.innerHTML = `
+                        <div class="file-preview">
+                            <img src="${e.target.result}" alt="${file.name}">
+                        </div>
+                        <div class="file-name">${file.name}</div>
+                    `;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                fileElement.innerHTML = `
+                    <div class="file-icon"><i class="bx bx-file"></i></div>
+                    <div class="file-name">${file.name}</div>
+                `;
+            }
 
-            stompClient.subscribe(`/user/${username}/queue/activities`, message => {
-                try {
-                    const data = JSON.parse(message.body);
-                    updateActiveUsers(data);
-                } catch (e) {
-                    // Silent error handling
-                }
-            });
+            attachmentPreview.appendChild(fileElement);
+        });
 
-            // Send connection-ready with headers
-            stompClient.publish({
-                destination: '/app/connection-ready',
-                body: JSON.stringify({}),
-                headers: { 'content-type': 'application/json' }
-            });
-        },
-        onWebSocketError: () => {
-            alert('Failed to connect to WebSocket server. Please try again.');
-        },
-    });
-
-    try {
-        stompClient.activate();
-    } catch (error) {
-        alert('Failed to initialize WebSocket connection.');
+        event.target.value = '';
     }
-}
+});
 
-function sendMessage() {
+function updateUIForSelectedUser(hasSelectedUser) {
+    const noUserSelectedEl = document.querySelector(".no-user-selected");
+    const messageAreaEl = document.querySelector(".message-area");
+    const messageFormEl = document.querySelector(".message-form");
     const messageInput = document.querySelector("input#message");
-    const message = messageInput.value.trim();
+    const sendBtn = document.querySelector(".send-btn");
 
-    if (!message || !selectedReceiver) return;
+    if (hasSelectedUser) {
+        noUserSelectedEl.classList.add("hidden");
+        messageAreaEl.classList.remove("hidden");
+        messageFormEl.classList.remove("hidden");
+        messageInput.disabled = false;
+        sendBtn.disabled = false;
+    } else {
+        noUserSelectedEl.classList.remove("hidden");
+        messageAreaEl.classList.add("hidden");
+        messageFormEl.classList.add("hidden");
+        messageInput.disabled = true;
+        sendBtn.disabled = true;
+    }
+}
 
-    const chatMessage = {
-        sender: username,
-        receiver: selectedReceiver,
-        message,
-        type: "MESSAGE",
-    };
+function createAttachmentPreview() {
+    const messageForm = document.querySelector('.message-form');
+    const oldPreview = document.querySelector('.attachment-preview');
 
-    stompClient.publish({
-        destination: '/app/publish',
-        body: JSON.stringify(chatMessage),
-        headers: { 'content-type': 'application/json' }
+    if (oldPreview) {
+        oldPreview.remove();
+    }
+
+    const attachmentPreview = document.createElement('div');
+    attachmentPreview.classList.add('attachment-preview');
+
+    const clearButton = document.createElement('button');
+    clearButton.classList.add('clear-attachments');
+    clearButton.innerHTML = '<i class="bx bx-x"></i>';
+    clearButton.addEventListener('click', () => {
+        connectionManager.clearAttachments();
     });
 
-    const outgoingMessage = { ...chatMessage, fromMe: true };
-    storeMessage(outgoingMessage);
-    displayMessage(outgoingMessage);
-    messageInput.value = '';
-}
+    attachmentPreview.appendChild(clearButton);
+    messageForm.insertBefore(attachmentPreview, document.getElementById('message'));
 
-function storeMessage(message) {
-    const otherUser = message.fromMe || message.sender === username ? message.receiver : message.sender;
-
-    if (!userMessages[otherUser]) {
-        userMessages[otherUser] = [];
-    }
-
-    userMessages[otherUser].push(message);
-}
-
-function incrementUnreadCount(sender) {
-    if (!unreadCounts[sender]) {
-        unreadCounts[sender] = 0;
-    }
-    unreadCounts[sender]++;
-}
-
-function displayMessage(message) {
-    const messageArea = document.querySelector(".message-area");
-    const messageElement = document.createElement("div");
-
-    messageElement.classList.add("message", message.sender === username || message.fromMe ? "own-message" : "other-message");
-
-    const time = message.date ? new Date(message.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    messageElement.innerHTML = `
-        <div class="message-header">
-            <span class="sender">${message.sender}</span>
-            <span class="time">${time}</span>
-        </div>
-        <div class="message-content">${message.message}</div>
-    `;
-
-    messageArea.appendChild(messageElement);
-    messageArea.scrollTop = messageArea.scrollHeight;
-}
-
-function loadUserMessages(user) {
-    const messageArea = document.querySelector(".message-area");
-    messageArea.innerHTML = '';
-
-    if (userMessages[user]) {
-        userMessages[user].forEach(msg => {
-            displayMessage(msg);
-        });
-    }
-}
-
-function updateActiveUsers(data) {
-    if (!data) return;
-
-    switch (data.type) {
-        case "ACTIVE_USERS_LIST":
-            if (Array.isArray(data.targetUsernames)) {
-                activeUsers = new Set(data.targetUsernames.filter(user => user && user.trim() !== ''));
-                renderUsersList();
-            }
-            break;
-        case "JOIN":
-            if (data.targetUsername && data.targetUsername.trim() !== '') {
-                activeUsers.add(data.targetUsername);
-                renderUsersList();
-                displayStatusMessage(`${data.targetUsername} has joined the chat`);
-            }
-            break;
-        case "LEAVE":
-            if (data.targetUsername) {
-                activeUsers.delete(data.targetUsername);
-                renderUsersList();
-                displayStatusMessage(`${data.targetUsername} has left the chat`);
-
-                if (data.targetUsername === selectedReceiver) {
-                    selectedReceiver = '';
-                    displayStatusMessage(`${data.targetUsername} has left the chat. Please select another user to chat with.`);
-                }
-            }
-            break;
-    }
-}
-
-function renderUsersList() {
-    const usersList = document.querySelector(".users-list");
-    usersList.innerHTML = '';
-
-    const filteredUsers = Array.from(activeUsers)
-        .filter(user => user && user.trim() !== '' && user !== username);
-
-    if (filteredUsers.length === 0) {
-        const emptyMessage = document.createElement("div");
-        emptyMessage.classList.add("empty-users-message");
-        emptyMessage.textContent = "No active users";
-        usersList.appendChild(emptyMessage);
-        return;
-    }
-
-    filteredUsers.forEach(user => {
-        const userItem = document.createElement("div");
-        userItem.classList.add("user-item");
-
-        if (user === selectedReceiver) {
-            userItem.classList.add("selected");
-        }
-
-        const initials = user.charAt(0).toUpperCase();
-        const hasUnread = unreadCounts[user] && unreadCounts[user] > 0;
-
-        userItem.innerHTML = `
-            <div class="user-avatar">${initials}</div>
-            <span>${user}</span>
-            ${hasUnread ? `<span class="unread-indicator"></span>` : ''}
-        `;
-
-        userItem.addEventListener("click", () => {
-            selectedReceiver = user;
-            document.querySelectorAll(".user-item").forEach(item => item.classList.remove("selected"));
-            userItem.classList.add("selected");
-
-            // Clear unread count
-            unreadCounts[user] = 0;
-
-            // Load messages for this user
-            loadUserMessages(user);
-
-            displayStatusMessage(`Now chatting with ${user}`);
-            document.querySelector(".sidebar").classList.remove("active");
-            renderUsersList();
-        });
-
-        usersList.appendChild(userItem);
-    });
-}
-
-function disconnectWebSocket() {
-    if (!stompClient) return;
-
-    stompClient.deactivate();
-
-    document.querySelector(".popup-overlay").style.display = "flex";
-    clearActiveUsers();
-}
-
-function clearActiveUsers() {
-    activeUsers.clear();
-    selectedReceiver = '';
-    userMessages = {};
-    unreadCounts = {};
-    document.querySelector(".users-list").innerHTML = '';
-    document.querySelector(".message-area").innerHTML = '';
-}
-
-function displayStatusMessage(text) {
-    const messageArea = document.querySelector(".message-area");
-    const statusElement = document.createElement("div");
-    statusElement.classList.add("status-message");
-    statusElement.textContent = text;
-
-    messageArea.appendChild(statusElement);
-    messageArea.scrollTop = messageArea.scrollHeight;
+    return attachmentPreview;
 }

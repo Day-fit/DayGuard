@@ -1,4 +1,4 @@
-package io.dayfit.github.dayguard.POJOs;
+package io.dayfit.github.dayguard.POJOs.Messages;
 
 import lombok.*;
 import lombok.experimental.SuperBuilder;
