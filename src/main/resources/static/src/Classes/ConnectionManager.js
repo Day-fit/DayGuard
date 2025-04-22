@@ -15,7 +15,7 @@ class ConnectionManager {
     }
 
     initializeWebSocketConnection() {
-        const socket = new SockJS('http://localhost:8080/ws', null, { withCredentials: true });
+        const socket = new SockJS('/ws', null, { withCredentials: true });
 
         this.stompClient = new Client({
             webSocketFactory: () => socket,
