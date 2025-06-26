@@ -1,7 +1,7 @@
 package io.dayfit.github.dayguard.EventListeners;
 
-import io.dayfit.github.dayguard.POJOs.Messages.ActivityMessage;
-import io.dayfit.github.dayguard.POJOs.Messages.RabbitMessage;
+import io.dayfit.github.dayguard.Messages.AbstractMessage;
+import io.dayfit.github.dayguard.Messages.ActivityMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
@@ -33,7 +33,7 @@ public class DynamicMessageListenerManager {
         MessageListenerAdapter messageListenerAdapter = new MessageListenerAdapter(new Object()
         {
             @SuppressWarnings("unused")
-            public void sendMessage(RabbitMessage message)
+            public void sendMessage(AbstractMessage message)
             {
                 template.convertAndSend("/user/"+username+"/queue/messages", message);
             }

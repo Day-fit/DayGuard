@@ -9,5 +9,5 @@ public class Attachment {
     private String name;
     private String data;
     private String type;
-    private String size;
+    private Long size;
 }

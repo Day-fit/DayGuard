@@ -1,6 +1,6 @@
 package io.dayfit.github.dayguard.Services;
 
-import io.dayfit.github.dayguard.POJOs.Messages.RabbitMessage;
+import io.dayfit.github.dayguard.Messages.AbstractMessage;
 import io.dayfit.github.dayguard.POJOs.MQ.UserMQ;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -13,7 +13,7 @@ public class MessagingService {
     private final MQService mqService;
     private final RabbitTemplate rabbitTemplate;
 
-    public void publishMessage(RabbitMessage message) throws IllegalArgumentException
+    public void publishMessage(AbstractMessage message) throws IllegalArgumentException
     {
         if (message.getReceiver() != null)
         {

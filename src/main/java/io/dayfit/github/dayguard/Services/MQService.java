@@ -1,8 +1,8 @@
 package io.dayfit.github.dayguard.Services;
 
 import io.dayfit.github.dayguard.Events.ActivityEvent;
-import io.dayfit.github.dayguard.POJOs.Messages.ActivityMessage;
-import io.dayfit.github.dayguard.POJOs.Messages.MessageType;
+import io.dayfit.github.dayguard.Messages.ActivityMessage;
+import io.dayfit.github.dayguard.POJOs.Messages.ActivitiesType;
 import io.dayfit.github.dayguard.POJOs.MQ.UserMQ;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
@@ -11,13 +11,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
-import java.util.Date;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -26,7 +24,6 @@ public class MQService {
     private final @Getter ConcurrentHashMap<String,UserMQ> usersMQ = new ConcurrentHashMap<>();
     private final RabbitAdmin rabbitAdmin;
     private final ApplicationEventPublisher eventPublisher;
-    private final SimpMessagingTemplate messagingTemplate;
 
     private final @Getter TopicExchange usersActivityExchange = new TopicExchange("users.activity");
     private final @Getter String ROUTING_KEY = "users.#";
@@ -75,10 +72,9 @@ public class MQService {
         eventPublisher.publishEvent(
                 new ActivityEvent(
                         ActivityMessage.builder()
-                                .targetUsername(username)
-                                .messageId(UUID.randomUUID().toString())
-                                .date(new Date())
-                                .type(MessageType.JOIN)
+                                .receiver("user.*")
+                                .messageUuid(UUID.randomUUID())
+                                .type(ActivitiesType.JOIN)
                                 .build()
                 )
         );
@@ -98,16 +94,17 @@ public class MQService {
 
     public void sendActivateUsersList(String receiverUsername)
     {
-        log.info("Sending activate users list to users activity exchange");
+        log.debug("Sending activate users list to users activity exchange");
 
-        messagingTemplate.convertAndSend("/user/"+receiverUsername+"/queue/activities",
-                ActivityMessage.builder()
-                        .targetUsernames(usersMQ.keySet().stream().filter(u -> !u.equals(receiverUsername)).collect(Collectors.toList()))
-                        .messageId(UUID.randomUUID().toString())
-                        .date(new Date())
-                        .type(MessageType.ACTIVE_USERS_LIST)
-                        .build()
-        );
+        usersMQ.keySet().forEach(user ->
+                eventPublisher.publishEvent(new ActivityEvent(
+                        ActivityMessage.builder()
+                                .receiver(receiverUsername)
+                                .messageUuid(UUID.randomUUID())
+                                .timestamp(Instant.now())
+                                .type(ActivitiesType.JOIN)
+                                .build()
+                )));
     }
 
     public void removeUser(String username)
@@ -124,10 +121,10 @@ public class MQService {
             eventPublisher.publishEvent(
                     new ActivityEvent(
                             ActivityMessage.builder()
-                                    .targetUsername(username)
-                                    .messageId(UUID.randomUUID().toString())
-                                    .date(new Date())
-                                    .type(MessageType.LEAVE)
+                                    .receiver("user.*")
+                                    .messageUuid(UUID.randomUUID())
+                                    .timestamp(Instant.now())
+                                    .type(ActivitiesType.LEAVE)
                                     .build()
                     )
             );
