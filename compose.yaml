@@ -77,9 +77,25 @@ services:
     volumes:
       - ./pgdata-dev:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - '5432:5432'
     labels:
       org.springframework.boot.service-connection: postgres
       org.springframework.boot.readiness-check.tcp.disable: false
+    profiles:
+      - dev
+
+  redis:
+    image: bitnami/redis:8.0.2
+    environment:
+      - 'REDIS_PASSWORD=${REDIS_PASSWORD}'
+    profiles:
+      - prod
+
+  redis-dev:
+    image: bitnami/redis:8.0.2
+    environment:
+      - 'REDIS_PASSWORD=secret'
+    ports:
+      - '6379:6379'
     profiles:
       - dev
