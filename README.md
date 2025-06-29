@@ -47,7 +47,7 @@ DayGuard is provided "as is" without any warranties. The author assumes no respo
 
 ## Future Plans (Sorted by priority)
 - Implement online website for front-end (Current frontend styling is written by AI, but this is only temporary)
-- Implement account functionality
+- Implement account functionality (We are working on it)
 - Support for group messaging
 - Support private messaging
 - Advanced encryption options
