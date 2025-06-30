@@ -7,15 +7,13 @@ import pl.dayfit.dayguard.Validators.Adnotations.ValidLogin;
 
 public class LoginDTOValidator implements ConstraintValidator<ValidLogin, LoginDTO> {
     @Override
-    public boolean isValid(LoginDTO loginDTO, ConstraintValidatorContext constraintValidatorContext) {
-        String username = loginDTO.getUsername();
-        String email = loginDTO.getEmail();
-        String password = loginDTO.getPassword();
+    public boolean isValid(LoginDTO loginDTO, ConstraintValidatorContext context) {
+        if (loginDTO == null) return false;
 
-        boolean hasValidUsername = username == null || username.isBlank();
-        boolean hasValidEmail = email == null || email.isBlank();
-        boolean hasValidPassword = password == null || password.isBlank();
+        boolean hasUsername = loginDTO.getUsername() != null && !loginDTO.getUsername().isBlank();
+        boolean hasEmail = loginDTO.getEmail() != null && !loginDTO.getEmail().isBlank();
+        boolean hasPassword = loginDTO.getPassword() != null && !loginDTO.getPassword().isBlank();
 
-        return (hasValidUsername || hasValidEmail) && hasValidPassword;
+        return (hasUsername ^ hasEmail) && hasPassword;
     }
 }

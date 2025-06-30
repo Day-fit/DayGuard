@@ -1,18 +1,21 @@
 {
-  "name": "static",
+  "name": "dayguard",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "../src/main/resources/static/node_modules/.bin/vite",
     "build": "../src/main/resources/static/node_modules/.bin/vite build",
-    "preview": "../src/main/resources/static/node_modules/.bin/vite preview"
+    "preview": "../src/main/resources/static/node_modules/.bin/vite preview",
+    "test": "mocha"
   },
   "devDependencies": {
+    "mocha": "^11.7.1",
     "vite": "^6.3.0"
   },
   "dependencies": {
     "@stomp/stompjs": "^7.1.1",
-    "sockjs-client": "^1.6.1"
+    "sockjs-client": "^1.6.1",
+    "@tailwindcss/vite": "^4.1.7"
   }
 }

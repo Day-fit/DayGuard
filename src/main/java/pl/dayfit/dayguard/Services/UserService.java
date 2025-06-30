@@ -1,6 +1,7 @@
 package pl.dayfit.dayguard.Services;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import pl.dayfit.dayguard.DTOs.Auth.RegisterDTO;
@@ -8,6 +9,9 @@ import pl.dayfit.dayguard.Entities.User;
 import pl.dayfit.dayguard.Exceptions.UserAlreadyExistException;
 import pl.dayfit.dayguard.Repositories.UserRepository;
 import pl.dayfit.dayguard.Services.Cache.UserCacheService;
+
+import java.util.ArrayList;
+import java.util.Collections;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +34,7 @@ public class UserService {
         user.setEmail(dto.getEmail());
         user.setUsername(dto.getUsername());
         user.setPassword(passwordEncoder.encode(dto.getPassword()));
+        user.setRoles(new ArrayList<>(Collections.singleton(new SimpleGrantedAuthority("user"))));
 
         userCacheService.save(user);
     }

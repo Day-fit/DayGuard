@@ -79,7 +79,7 @@ public class AuthenticationController {
     public ResponseEntity<?> handleRegistration(@RequestBody @Valid RegisterDTO dto)
     {
         userService.register(dto);
-        return ResponseEntity.ok("User has been successfully registered");
+        return ResponseEntity.ok(Map.of("message", "User has been successfully registered"));
     }
 
     @PostMapping("/api/v1/auth/refresh")
