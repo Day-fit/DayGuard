@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "../src/main/resources/static/node_modules/.bin/vite",
+    "build": "../src/main/resources/static/node_modules/.bin/vite build",
+    "preview": "../src/main/resources/static/node_modules/.bin/vite preview"
   },
   "devDependencies": {
     "vite": "^6.3.0"

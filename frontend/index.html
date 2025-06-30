@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DayGuard</title>
-  <link rel="stylesheet" href="/src/style.css">
+  <link rel="stylesheet" href="./src/style.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/boxicons@latest/css/boxicons.min.css">
 </head>
 <body>
@@ -64,7 +64,7 @@
           <i class="bx bx-paperclip"></i>
         </button>
         <input type="file" id="file-input" class="hidden" multiple>
-        <input type="text" id="message" placeholder="Type your message here..." disabled>
+        <label for="message"></label><input type="text" id="message" placeholder="Type your message here..." disabled>
         <button class="send-btn" disabled><i class="bx bx-send"></i><span>Send</span></button>
       </footer>
     </div>
@@ -74,6 +74,6 @@
 <script src="src/Classes/MessageManager.js"></script>
 <script src="src/Classes/UserListManager.js"></script>
 <script src="src/Classes/ConnectionManager.js" type="module"></script>
-<script src="./src/main.js" type="module"></script>
+<script src="src/main.js" type="module"></script>
 </body>
 </html>
