@@ -5,8 +5,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -21,7 +19,6 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import pl.dayfit.dayguard.Configurations.Properties.CookiePropertiesConfiguration;
 import pl.dayfit.dayguard.Configurations.Properties.SecurityPropertiesConfiguration;
 import pl.dayfit.dayguard.Filters.CookieJwtFilter;
-import pl.dayfit.dayguard.Services.Auth.Jwt.UserDetailsService;
 
 @Slf4j
 @Configuration
@@ -73,14 +70,5 @@ public class SecurityConfiguration {
     public PasswordEncoder passwordEncoder()
     {
         return new BCryptPasswordEncoder(12);
-    }
-
-    @Bean
-    public AuthenticationProvider authenticationProvider(UserDetailsService userDetailsService) {
-        DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider();
-        authenticationProvider.setUserDetailsService(userDetailsService);
-        authenticationProvider.setPasswordEncoder(passwordEncoder());
-
-        return authenticationProvider;
     }
 }

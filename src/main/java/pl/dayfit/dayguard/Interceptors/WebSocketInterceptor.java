@@ -19,20 +19,22 @@ public class WebSocketInterceptor implements ChannelInterceptor {
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-        if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand()))
+        if(accessor == null || StompCommand.CONNECT.equals(accessor.getCommand()))
         {
-            String username = accessor.getFirstNativeHeader("username");
-            log.debug("username is {} (IN HEADER)", username);
+            return message;
+        }
 
-            if(username != null && !username.isEmpty())
-            {
-                accessor.setUser(new StompPrincipal(username));
-            }
+        String username = accessor.getFirstNativeHeader("username");
+        log.debug("username is {} (IN HEADER)", username);
 
-            else
-            {
-                throw new RuntimeException("Username can not be empty");
-            }
+        if(username != null && !username.isEmpty())
+        {
+            accessor.setUser(new StompPrincipal(username));
+        }
+
+        else
+        {
+            throw new IllegalArgumentException("Username can not be empty");
         }
 
         return message;

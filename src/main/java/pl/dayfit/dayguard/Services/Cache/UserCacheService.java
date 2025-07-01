@@ -31,15 +31,15 @@ public class UserCacheService {
 
     /**
      * Finds user by username or email.
-     * @param value value compared to username and email in a query
+     * @param identifier identifier compared to username and email in a query
      * @return User matching given username or email
      * @throws UsernameNotFoundException if no user exists with a given username or email
      */
-    @Cacheable(value = "user", key = "#value")
-    public User findByEmailOrUsername(String value) throws UsernameNotFoundException
+    @Cacheable(value = "user", key = "#identifier")
+    public User findByEmailOrUsername(String identifier) throws UsernameNotFoundException
     {
-        return userRepository.findByEmailOrUsername(value)
-                .orElseThrow(() -> new UsernameNotFoundException("User with given email or username is not registered"));
+        return userRepository.findByEmailOrUsername(identifier)
+                .orElseThrow(() -> new UsernameNotFoundException("No user with identifier " + identifier + "has been found"));
     }
 
     /**

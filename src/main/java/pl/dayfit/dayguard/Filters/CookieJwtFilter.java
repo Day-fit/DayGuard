@@ -20,7 +20,15 @@ import java.util.Arrays;
 public class CookieJwtFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain) throws ServletException, IOException {
-        Cookie accessTokenCookie = Arrays.stream(request.getCookies())
+        Cookie[] cookies = request.getCookies();
+
+        if (cookies == null)
+        {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        Cookie accessTokenCookie = Arrays.stream(cookies)
                 .filter(cookie -> cookie.getName().equalsIgnoreCase("accessCookie"))
                 .findFirst()
                 .orElse(null);
@@ -29,8 +37,6 @@ public class CookieJwtFilter extends OncePerRequestFilter {
         {
             filterChain.doFilter(request, response);
         }
-
-
     }
 
     @Override
