@@ -14,8 +14,6 @@ DayGuard is a secure and privacy-focused communication platform built with Sprin
 - **Spring WebSockets** – Enables real-time communication
 - **Spring Security** – Handles authentication and authorization (Coming soon !)
 - **Spring Data JPA** – Simplifies database interactions
-- **JDBC API** – Java Database Connectivity for database operations
-- **Spring Data JDBC** – Simplifies database interactions
 - **PostgreSQL** – Database support (Coming soon !)
 - **Nginx** - Used for enabling HTTPS by using reverse proxy to the Spring-boot server
 - **RabbitMQ** - Used for handling queues of the messages
