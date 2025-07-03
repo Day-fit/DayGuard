@@ -5,7 +5,7 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import pl.dayfit.dayguard.Services.Auth.Jwt.JwtService;
 import pl.dayfit.dayguard.Services.Auth.Jwt.UserDetailsService;
@@ -13,41 +13,26 @@ import pl.dayfit.dayguard.Services.Auth.Jwt.UserDetailsService;
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationProvider implements AuthenticationProvider {
-    private final PasswordEncoder passwordEncoder;
-    private final UserDetailsService userDetailsService;
     private final JwtService jwtService;
-
-    public static final long ACCESS_TOKEN_COOKIE_VALIDITY_TIME = 1000 * 60 * 15; //15 minutes
-    public static final long REFRESH_TOKEN_COOKIE_VALIDITY_TIME = 1000 * 60 * 60 * 24; //24 hours
+    private final UserDetailsService userDetailsService;
 
     @Override
     public Authentication authenticate(Authentication authentication) throws AuthenticationException {
-        JwtAuthenticationCandidate candidate = (JwtAuthenticationCandidate) authentication;
-        UserDetailsImplementation userDetails = userDetailsService.loadUserByUsername((String) candidate.getPrincipal());
-
-        if (!passwordEncoder.matches((String) candidate.getCredentials(), userDetails.getPassword()))
+        String accessToken = (String) authentication.getCredentials();
+        if(!(jwtService.isValidToken(accessToken)))
         {
-            throw new BadCredentialsException("Given credentials are incorrect");
+            throw new BadCredentialsException("Access token is invalid");
         }
 
-        return new JwtAuthenticationToken (
-                (String) candidate.getPrincipal(),
-                jwtService.generateToken(
-                        userDetails.getId(),
-                        ACCESS_TOKEN_COOKIE_VALIDITY_TIME
-                ),
-
-                jwtService.generateToken(
-                        userDetails.getId(),
-                        REFRESH_TOKEN_COOKIE_VALIDITY_TIME
-                ),
-
-                userDetails.getAuthorities()
+        UserDetails userDetails = userDetailsService.loadUserByUsername(
+                jwtService.getUsername(accessToken)
         );
+
+        return new JwtAuthenticationToken(userDetails);
     }
 
     @Override
     public boolean supports(Class<?> authentication) {
-        return JwtAuthenticationCandidate.class.isAssignableFrom(authentication);
+        return JwtAuthenticationToken.class.isAssignableFrom(authentication);
     }
 }

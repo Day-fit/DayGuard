@@ -4,18 +4,21 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
-import pl.dayfit.dayguard.Auth.JwtAuthenticationCandidate;
-import pl.dayfit.dayguard.Auth.JwtAuthenticationProvider;
-import pl.dayfit.dayguard.Auth.JwtAuthenticationToken;
+import pl.dayfit.dayguard.Auth.UserCredentialsAuthenticationCandidate;
+import pl.dayfit.dayguard.Auth.UserCredentialsAuthenticationProvider;
+import pl.dayfit.dayguard.Auth.UserCredentialsAuthenticationToken;
 import pl.dayfit.dayguard.Configurations.Properties.CookiePropertiesConfiguration;
 import pl.dayfit.dayguard.DTOs.Auth.LoginDTO;
 import pl.dayfit.dayguard.DTOs.Auth.RegisterDTO;
@@ -28,23 +31,23 @@ import java.util.Map;
 @RestController
 @RequiredArgsConstructor
 public class AuthenticationController {
-    public final String ACCESS_TOKEN_NAME = "accessToken";
-    public final String REFRESH_TOKEN_NAME = "refreshToken";
+    public static final String ACCESS_TOKEN_NAME = "accessToken";
+    public static final String REFRESH_TOKEN_NAME = "refreshToken";
 
     private final CookiePropertiesConfiguration cookieProperties;
 
     private final JwtService jwtService;
     private final UserService userService;
-    private final AuthenticationProvider jwtAuthenticationProvider;
+    private final UserCredentialsAuthenticationProvider userCredentialsAuthenticationProvider;
 
     @PostMapping("/api/v1/auth/login")
     public ResponseEntity<?> handleLogin(@RequestBody @Valid LoginDTO dto, HttpServletResponse response)
     {
-        String identifier = dto.getEmail() != null? dto.getEmail() : dto.getUsername();
+        String identifier = dto.getIdentifier();
         String password = dto.getPassword();
 
-        JwtAuthenticationCandidate candidate = new JwtAuthenticationCandidate(identifier, password);
-        JwtAuthenticationToken authenticationToken = (JwtAuthenticationToken) jwtAuthenticationProvider.authenticate(candidate);
+        UserCredentialsAuthenticationCandidate candidate = new UserCredentialsAuthenticationCandidate(identifier, password);
+        UserCredentialsAuthenticationToken authenticationToken = (UserCredentialsAuthenticationToken) userCredentialsAuthenticationProvider.authenticate(candidate);
 
         ResponseCookie accessToken = ResponseCookie.from(
                 ACCESS_TOKEN_NAME,
@@ -53,6 +56,7 @@ public class AuthenticationController {
                 .secure(cookieProperties.isUsingSecuredCookies())
                 .sameSite(cookieProperties.getSameSitePolicy())
                 .httpOnly(true)
+                .path("/")
                 .build();
 
         ResponseCookie refreshToken = ResponseCookie.from(
@@ -62,6 +66,7 @@ public class AuthenticationController {
                 .secure(cookieProperties.isUsingSecuredCookies())
                 .sameSite(cookieProperties.getSameSitePolicy())
                 .httpOnly(true)
+                .path("/")
                 .build();
 
         response.addHeader(
@@ -106,14 +111,14 @@ public class AuthenticationController {
 
         String refreshTokenValue = refreshToken.getValue();
 
-        if(jwtService.isValidToken(refreshTokenValue))
+        if(!jwtService.isValidToken(refreshTokenValue))
         {
             throw new BadCredentialsException("Invalid refresh token");
         }
 
         ResponseCookie accessToken = ResponseCookie.from(
                 ACCESS_TOKEN_NAME,
-                jwtService.generateToken(jwtService.extractId(refreshTokenValue), JwtAuthenticationProvider.ACCESS_TOKEN_COOKIE_VALIDITY_TIME)
+                jwtService.generateToken(jwtService.extractId(refreshTokenValue), UserCredentialsAuthenticationProvider.ACCESS_TOKEN_COOKIE_VALIDITY_TIME)
         )
                 .secure(cookieProperties.isUsingSecuredCookies())
                 .sameSite(cookieProperties.getSameSitePolicy())
@@ -126,5 +131,47 @@ public class AuthenticationController {
         );
 
         return ResponseEntity.ok(Map.of("message", "Access token has been refreshed"));
+    }
+
+    @PostMapping("/api/v1/auth/logout")
+    public ResponseEntity<?> handleLogout(HttpServletResponse response)
+    {
+        ResponseCookie accessToken = ResponseCookie.from(
+                ACCESS_TOKEN_NAME,
+                ""
+        )
+                .secure(cookieProperties.isUsingSecuredCookies())
+                .sameSite(cookieProperties.getSameSitePolicy())
+                .httpOnly(true)
+                .maxAge(0)
+                .build();
+
+        ResponseCookie refreshToken = ResponseCookie.from(
+                        REFRESH_TOKEN_NAME,
+                        ""
+                )
+                .secure(cookieProperties.isUsingSecuredCookies())
+                .sameSite(cookieProperties.getSameSitePolicy())
+                .httpOnly(true)
+                .maxAge(0)
+                .build();
+
+        response.addHeader(
+                HttpHeaders.SET_COOKIE,
+                accessToken.toString()
+        );
+
+        response.addHeader(
+                HttpHeaders.SET_COOKIE,
+                refreshToken.toString()
+        );
+
+        return ResponseEntity.ok(Map.of("message", "Logout ended successfully"));
+    }
+
+    @GetMapping("/api/v1/auth/get-user-details")
+    public ResponseEntity<?> getUserDetails(@AuthenticationPrincipal @NotNull UserDetails details)
+    {
+        return ResponseEntity.ok(userService.getUserDetailsDTO(details.getUsername()));
     }
 }

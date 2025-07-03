@@ -10,9 +10,7 @@ export default {
         include: ['@stomp/stompjs']
     },
     build: {
-        build: {
-          outDir: "dist",
-        },
+        outDir: "dist",
 
         rollupOptions: {
             external: [],
@@ -28,6 +26,12 @@ export default {
               target: 'http://localhost:8080',
               changeOrigin: true,
               secure: false,
+          },
+
+          '/ws': {
+              target: 'http://localhost:8080',
+              ws: true,
+              changeOrigin: true,
           },
       },
     },

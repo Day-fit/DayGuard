@@ -20,6 +20,8 @@ import pl.dayfit.dayguard.Configurations.Properties.CookiePropertiesConfiguratio
 import pl.dayfit.dayguard.Configurations.Properties.SecurityPropertiesConfiguration;
 import pl.dayfit.dayguard.Filters.CookieJwtFilter;
 
+import java.util.List;
+
 @Slf4j
 @Configuration
 @EnableWebSecurity
@@ -41,11 +43,14 @@ public class SecurityConfiguration {
     public SecurityFilterChain securityFilterChain(HttpSecurity http, CookieJwtFilter cookieJwtFilter) throws Exception
     {
         return http
-                .csrf(AbstractHttpConfigurer::disable) //CSRF is not a possible cause of same-site policy, httpOnly cookies, etc.
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(AbstractHttpConfigurer::disable) //CSRF attack is not a possible cause of same-site policy, httpOnly cookies, etc.
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(
                         request -> {
-                            request.requestMatchers(securityProperties.getProtectedPaths().toArray(new String[0]));
+                            request.requestMatchers("/ws/**").permitAll();
+                            request.requestMatchers("/api/v1/auth/login").permitAll();
+                            request.requestMatchers(securityProperties.getProtectedPaths().toArray(new String[0])).authenticated();
                             request.anyRequest().permitAll();
                         }
                 )
@@ -54,15 +59,15 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource()
-    {
+    public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
-        config.setAllowedOriginPatterns(securityProperties.getAllowedOrigins());
+        config.setAllowedOrigins(securityProperties.getAllowedOrigins());
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
-
         return source;
     }
 

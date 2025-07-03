@@ -1,22 +1,36 @@
 package pl.dayfit.dayguard.Messages;
 
-import pl.dayfit.dayguard.POJOs.Messages.ActivitiesType;
-import lombok.*;
 import lombok.experimental.SuperBuilder;
+import pl.dayfit.dayguard.DTOs.ActivityMessageDTO;
+import pl.dayfit.dayguard.POJOs.Messages.ActivityType;
+import lombok.*;
+
+import java.time.Instant;
+import java.util.UUID;
 
 @Getter
 @Setter
 @SuperBuilder
-public class ActivityMessage extends AbstractMessage {
-    private ActivitiesType type;
-    private String targetUser;
+public class ActivityMessage implements Sendable {
+    protected ActivityType type;
+    protected String targetUsername;
+    protected Instant timestamp;
+    protected UUID messageUuid;
+
+    protected ActivityMessageService sendingService;
 
     /**
      * Method that handles the sending logic
-     * //TODO: to be implemented
      */
     @Override
     public void send() {
-
+        sendingService.handleActivityMessageSending(
+                ActivityMessageDTO.builder()
+                        .targetUsername(targetUsername)
+                        .uuid(messageUuid)
+                        .timestamp(timestamp)
+                        .type(type)
+                        .build()
+        );
     }
 }

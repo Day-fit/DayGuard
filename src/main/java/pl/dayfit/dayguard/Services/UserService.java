@@ -5,6 +5,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import pl.dayfit.dayguard.DTOs.Auth.RegisterDTO;
+import pl.dayfit.dayguard.DTOs.Auth.UserDetailsResponseDTO;
 import pl.dayfit.dayguard.Entities.User;
 import pl.dayfit.dayguard.Exceptions.UserAlreadyExistException;
 import pl.dayfit.dayguard.Repositories.UserRepository;
@@ -37,5 +38,15 @@ public class UserService {
         user.setRoles(new ArrayList<>(Collections.singleton(new SimpleGrantedAuthority("user"))));
 
         userCacheService.save(user);
+    }
+
+    public UserDetailsResponseDTO getUserDetailsDTO(String identifier)
+    {
+        User user = userCacheService.findByEmailOrUsername(identifier);
+
+        return UserDetailsResponseDTO.builder()
+                .email(user.getEmail())
+                .username(user.getUsername())
+                .build();
     }
 }

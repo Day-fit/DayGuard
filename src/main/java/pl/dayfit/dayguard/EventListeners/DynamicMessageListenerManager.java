@@ -1,5 +1,8 @@
 package pl.dayfit.dayguard.EventListeners;
 
+import org.springframework.context.event.EventListener;
+import org.springframework.web.socket.messaging.SessionConnectEvent;
+import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import pl.dayfit.dayguard.Messages.AbstractMessage;
 import pl.dayfit.dayguard.Messages.ActivityMessage;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +14,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -21,8 +25,24 @@ public class DynamicMessageListenerManager {
     private final SimpMessagingTemplate template;
     private final ConcurrentHashMap<String, ArrayList<SimpleMessageListenerContainer>> listeners = new ConcurrentHashMap<>();
 
-    public void registerListeners(String username, String messageQueueName, String activityQueueName)
+    @EventListener
+    public void registerListeners(SessionConnectEvent event)
     {
+        if (event.getUser() == null)
+        {
+            return;
+        }
+
+        String username = event.getUser().getName();
+
+        if (username == null)
+        {
+            return;
+        }
+
+        String messageQueueName = username + "queue.pm";
+        String activityQueueName = username + "queue.activity";
+
         ArrayList<SimpleMessageListenerContainer> containers = new ArrayList<>();
 
         if(listeners.containsKey(username)){return;}
@@ -65,9 +85,17 @@ public class DynamicMessageListenerManager {
         listeners.put(username, containers);
     }
 
-    public void removeMessageListener(String username)
+    @EventListener
+    public void removeMessageListener(SessionDisconnectEvent event)
     {
-        ArrayList<SimpleMessageListenerContainer> containers = listeners.remove(username);
+        if (event.getUser() == null)
+        {
+            return;
+        }
+
+        String username = event.getUser().getName();
+
+        List<SimpleMessageListenerContainer> containers = listeners.remove(username);
 
         if (containers.isEmpty())
         {

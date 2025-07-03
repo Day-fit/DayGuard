@@ -6,51 +6,44 @@ class ConnectionManager {
         this.messageManager = messageManager;
         this.userListManager = userListManager;
         this.stompClient = null;
-        this.username = '';
         this.attachments = [];
+        this.identifier = '';
     }
 
-    setUsername(username) {
-        this.username = username;
+    setIdentifier(identifier)
+    {
+        this.identifier = identifier;
     }
 
     initializeWebSocketConnection() {
-        const socket = new SockJS('/ws', null, { withCredentials: true });
-
         this.stompClient = new Client({
-            webSocketFactory: () => socket,
-            connectHeaders: { username: this.username },
+            webSocketFactory: () => new SockJS('/ws', undefined, {
+                withCredentials: true,
+                transports: ['websocket', 'xhr-polling']
+            }),
+            debug: frame => console.log('[STOMP DEBUG]', frame),
             onConnect: () => {
-                document.querySelector(".popup-overlay").style.display = "none";
+                document.querySelector('.popup-overlay').style.display = 'none';
 
-                this.stompClient.subscribe(`/user/${this.username}/queue/messages`, message => {
-                    try {
-                        const receivedMessage = JSON.parse(message.body);
-                        if (!receivedMessage.fromMe) {
-                            this.messageManager.storeMessage(receivedMessage);
-
-                            if (receivedMessage.sender === this.userListManager.getSelectedReceiver()) {
-                                this.messageManager.displayMessage(receivedMessage);
-                            } else {
-                                this.messageManager.incrementUnreadCount(receivedMessage.sender);
-                                this.userListManager.renderUsersList();
-                            }
+                this.stompClient.subscribe(
+                    `/user/${this.identifier}/queue/messages`,
+                    message => {
+                        const msg = JSON.parse(message.body);
+                        if (!msg.fromMe) {
+                            this.messageManager.storeMessage(msg);
+                            msg.sender === this.userListManager.getSelectedReceiver()
+                                ? this.messageManager.displayMessage(msg)
+                                : (this.messageManager.incrementUnreadCount(msg.sender), this.userListManager.renderUsersList());
                         }
-                    } catch (error) {
-                        console.error("Error processing message", error);
                     }
-                });
+                );
 
                 this.stompClient.subscribe('/topic/public', () => {});
 
-                this.stompClient.subscribe(`/user/${this.username}/queue/activities`, message => {
-                    try {
-                        const activity = JSON.parse(message.body);
-                        this.userListManager.updateActiveUsers(activity);
-                    } catch (error) {
-                        console.error("Error processing activity", error);
-                    }
-                });
+                this.stompClient.subscribe(
+                    `/user/${this.identifier}/queue/activities`,
+                    message => this.userListManager.updateActiveUsers(JSON.parse(message.body))
+                );
 
                 this.stompClient.publish({
                     destination: '/app/connection-ready',
@@ -58,16 +51,11 @@ class ConnectionManager {
                     headers: { 'content-type': 'application/json' }
                 });
             },
-            onWebSocketError: () => {
-                alert('Failed to connect to WebSocket server. Please try again.');
-            },
+            onStompError: frame => alert(`STOMP protocol error: ${frame.body}`),
+            onWebSocketClose: event => alert('WebSocket connection closed'),
         });
 
-        try {
-            this.stompClient.activate();
-        } catch (error) {
-            alert('Failed to initialize WebSocket connection.');
-        }
+        this.stompClient.activate();
     }
 
     addAttachment(file) {
@@ -99,7 +87,7 @@ class ConnectionManager {
         if ((!message && this.attachments.length === 0) || !selectedReceiver) return false;
 
         const chatMessage = {
-            sender: this.username,
+            sender: this.identifier,
             receiver: selectedReceiver,
             message: message || "",
             type: this.attachments.length > 0 ? "MESSAGE_WITH_ATTACHMENT" : "TEXT_MESSAGE",

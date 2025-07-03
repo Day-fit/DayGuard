@@ -1,14 +1,14 @@
 package pl.dayfit.dayguard.DTOs.Auth;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.Getter;
-import pl.dayfit.dayguard.Validators.Adnotations.ValidLogin;
 
 @Getter
 @Builder
-@ValidLogin
 public class LoginDTO {
-    private String username;
-    private String email;
+    @NotNull
+    private String identifier;
+    @NotNull
     private String password;
 }

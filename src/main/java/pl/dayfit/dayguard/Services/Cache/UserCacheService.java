@@ -5,6 +5,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import pl.dayfit.dayguard.Entities.User;
@@ -39,7 +40,7 @@ public class UserCacheService {
     public User findByEmailOrUsername(String identifier) throws UsernameNotFoundException
     {
         return userRepository.findByEmailOrUsername(identifier)
-                .orElseThrow(() -> new UsernameNotFoundException("No user with identifier " + identifier + "has been found"));
+                .orElseThrow(() -> new BadCredentialsException("Given credentials are incorrect"));
     }
 
     /**

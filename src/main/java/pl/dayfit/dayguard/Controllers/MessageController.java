@@ -44,9 +44,6 @@ public class MessageController {
                     .sender(username)
                     .receiver(textMessageDTO.getReceiver())
                     .build();
-
-            message.send();
-            return ResponseEntity.ok(Map.of("message", "message sent successfully"));
         }
 
         else if (messageDto instanceof AttachmentMessageDTO attachmentMessageDTO)
@@ -85,7 +82,8 @@ public class MessageController {
         }
 
         message.send();
-
         return ResponseEntity.ok(Map.of("message", "message sent successfully"));
     }
+
+
 }

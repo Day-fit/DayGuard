@@ -1,31 +1,26 @@
 package pl.dayfit.dayguard.Configurations;
 
-import pl.dayfit.dayguard.Interceptors.WebSocketInterceptor;
-import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
+import pl.dayfit.dayguard.Configurations.Properties.SecurityPropertiesConfiguration;
+import pl.dayfit.dayguard.Interceptors.AuthorizationInterceptor;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
-import org.springframework.web.socket.server.support.HttpSessionHandshakeInterceptor;
 
 @Configuration
 @EnableWebSocketMessageBroker
 @RequiredArgsConstructor
 public class WebsocketConfig implements WebSocketMessageBrokerConfigurer {
-
-    @Value("${allowed.origins:http://localhost:5173}")
-    private String allowedOrigins;
-    private final WebSocketInterceptor interceptor;
-
+    private final SecurityPropertiesConfiguration configuration;
+    private final AuthorizationInterceptor interceptor;
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                .setAllowedOrigins(allowedOrigins)
-                .setAllowedOriginPatterns("*")
-                .addInterceptors(new HttpSessionHandshakeInterceptor())
+                .setAllowedOrigins(configuration.getAllowedOrigins().toArray(new String[0]))
+                .setAllowedOriginPatterns(configuration.getAllowedOrigins().toArray(new String[0]))
                 .withSockJS();
     }
 

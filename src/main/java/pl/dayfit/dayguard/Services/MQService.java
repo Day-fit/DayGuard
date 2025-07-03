@@ -1,8 +1,11 @@
 package pl.dayfit.dayguard.Services;
 
-import pl.dayfit.dayguard.Events.ActivityEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.web.socket.messaging.SessionConnectEvent;
+import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import pl.dayfit.dayguard.Messages.ActivityMessage;
-import pl.dayfit.dayguard.POJOs.Messages.ActivitiesType;
+import pl.dayfit.dayguard.Messages.DedicatedActivityMessage;
+import pl.dayfit.dayguard.POJOs.Messages.ActivityType;
 import pl.dayfit.dayguard.POJOs.MQ.UserMQ;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
@@ -10,7 +13,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -23,10 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class MQService {
     private final @Getter ConcurrentHashMap<String,UserMQ> usersMQ = new ConcurrentHashMap<>();
     private final RabbitAdmin rabbitAdmin;
-    private final ApplicationEventPublisher eventPublisher;
-
     private final @Getter TopicExchange usersActivityExchange = new TopicExchange("users.activity");
-    private final @Getter String ROUTING_KEY = "users.#";
 
     @PostConstruct
     public void init()
@@ -39,8 +38,21 @@ public class MQService {
         }
     }
 
-    public void addUser(String username)
+    @EventListener
+    public void addUser(SessionConnectEvent event)
     {
+        if (event.getUser() == null)
+        {
+            return;
+        }
+
+        String username = event.getUser().getName();
+
+        if (username == null)
+        {
+            return;
+        }
+
         if(usersMQ.containsKey(username))
         {
             log.warn("User already exists with name {}",username);
@@ -69,15 +81,14 @@ public class MQService {
         rabbitAdmin.declareQueue(queueActivity);
         rabbitAdmin.declareBinding(bindingActivity);
 
-        eventPublisher.publishEvent(
-                new ActivityEvent(
-                        ActivityMessage.builder()
-                                .receiver("user.*")
-                                .messageUuid(UUID.randomUUID())
-                                .type(ActivitiesType.JOIN)
-                                .build()
-                )
-        );
+        ActivityMessage.builder()
+                .sendingService(activityMessageService)
+                .messageUuid(UUID.randomUUID())
+                .targetUsername(username)
+                .type(ActivityType.JOIN)
+                .timestamp(Instant.now())
+                .build()
+                .send();
 
         usersMQ.put(username,
                 UserMQ.builder()
@@ -97,41 +108,46 @@ public class MQService {
         log.debug("Sending activate users list to users activity exchange");
 
         usersMQ.keySet().forEach(user ->
-                eventPublisher.publishEvent(new ActivityEvent(
-                        ActivityMessage.builder()
-                                .receiver(receiverUsername)
-                                .messageUuid(UUID.randomUUID())
-                                .timestamp(Instant.now())
-                                .type(ActivitiesType.JOIN)
-                                .build()
-                )));
+            DedicatedActivityMessage.builder()
+                    .receiver(receiverUsername)
+                    .messageUuid(UUID.randomUUID())
+                    .timestamp(Instant.now())
+                    .type(ActivityType.IS_CONNECTED)
+                    .sendingService(activityMessageService)
+                    .build()
+        );
     }
 
-    public void removeUser(String username)
+    @EventListener
+    public void removeUser(SessionDisconnectEvent event)
     {
-        if(usersMQ.containsKey(username))
+        if (event.getUser() == null)
         {
-            UserMQ userToRemove = usersMQ.remove(username);
-
-            rabbitAdmin.deleteQueue(userToRemove.getQueuePM().getName());
-            rabbitAdmin.deleteExchange(userToRemove.getExchangePM().getName());
-
-            rabbitAdmin.deleteQueue(userToRemove.getQueueActivity().getName());
-
-            eventPublisher.publishEvent(
-                    new ActivityEvent(
-                            ActivityMessage.builder()
-                                    .receiver("user.*")
-                                    .messageUuid(UUID.randomUUID())
-                                    .timestamp(Instant.now())
-                                    .type(ActivitiesType.LEAVE)
-                                    .build()
-                    )
-            );
             return;
         }
 
-        log.warn("Failed to find user with name {}, skipping removal",username);
+        String username = event.getUser().getName();
+
+        if(!usersMQ.containsKey(username))
+        {
+            log.debug("Failed to find user with name {}, skipping removal", username);
+            return;
+        }
+
+        UserMQ userToRemove = usersMQ.remove(username);
+
+        rabbitAdmin.deleteQueue(userToRemove.getQueuePM().getName());
+        rabbitAdmin.deleteExchange(userToRemove.getExchangePM().getName());
+
+        rabbitAdmin.deleteQueue(userToRemove.getQueueActivity().getName());
+
+        ActivityMessage.builder()
+                .messageUuid(UUID.randomUUID())
+                .sendingService(activityMessageService)
+                .targetUsername(username).timestamp(Instant.now())
+                .type(ActivityType.JOIN)
+                .build()
+                .send();
     }
 
     public UserMQ getUser(String username)

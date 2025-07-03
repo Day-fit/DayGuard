@@ -1,31 +1,28 @@
 package pl.dayfit.dayguard.Auth;
 
+import lombok.Getter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 
-public class JwtAuthenticationToken extends AbstractAuthenticationToken {
-    private final String accessToken;
+public class UserCredentialsAuthenticationToken extends AbstractAuthenticationToken {
+    private final String jwtAccessToken;
+    private final @Getter String jwtRefreshToken;
     private final UserDetails userDetails;
 
-    public JwtAuthenticationToken(String accessToken)
-    {
-        super(null);
-        this.accessToken = accessToken;
-        this.userDetails = null;
-        setAuthenticated(false);
-    }
-
-    public JwtAuthenticationToken(UserDetails userDetails)
+    public UserCredentialsAuthenticationToken(UserDetails userDetails, String jwtAccessToken, String jwtRefreshToken)
     {
         super(userDetails.getAuthorities());
-        this.accessToken = null;
+
+        this.jwtAccessToken = jwtAccessToken;
+        this.jwtRefreshToken = jwtRefreshToken;
         this.userDetails = userDetails;
+
         setAuthenticated(true);
     }
 
     @Override
     public Object getCredentials() {
-        return accessToken;
+        return jwtAccessToken;
     }
 
     @Override

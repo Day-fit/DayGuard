@@ -17,10 +17,7 @@ const loginError = document.getElementById('login-error');
 const registerError = document.getElementById('register-error');
 const currentUserSpan = document.getElementById('current-user');
 const logoutBtn = document.getElementById('logout-btn');
-const usersList = document.getElementById('users-list');
-const messageArea = document.getElementById('message-area');
 const noUserSelected = document.getElementById('no-user-selected');
-const messageFormContainer = document.getElementById('message-form-container');
 const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
 const attachmentBtn = document.getElementById('attachment-btn');
@@ -66,11 +63,11 @@ registerForm.addEventListener('submit', async (e) => {
             await loginUser(regUsername, regPassword);
         } else {
             const data = await res.json();
-            registerError.textContent = data.message || 'Błąd rejestracji';
+            registerError.textContent = data.message || 'Error during registration';
             registerError.classList.remove('hidden');
         }
     } catch {
-        registerError.textContent = 'Błąd połączenia z serwerem';
+        registerError.textContent = 'Error connecting to server';
         registerError.classList.remove('hidden');
     }
 });
@@ -79,29 +76,29 @@ registerForm.addEventListener('submit', async (e) => {
 loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     loginError.classList.add('hidden');
-    const logUsername = document.getElementById('login-username').value.trim();
+    const logIdentifier = document.getElementById('login-identifier').value.trim();
     const logPassword = document.getElementById('login-password').value;
-    await loginUser(logUsername, logPassword);
+    await loginUser(logIdentifier, logPassword);
 });
 
-async function loginUser(logUsername, logPassword) {
+async function loginUser(identifier, logPassword) {
     try {
         const res = await fetch('/api/v1/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ username: logUsername, password: logPassword }),
+            body: JSON.stringify({ identifier: identifier, password: logPassword }),
         });
         if (res.status === 200) {
-            username = logUsername;
+            username = identifier;
             showChat();
         } else {
             const data = await res.json();
-            loginError.textContent = data.message || 'Błędny login lub hasło';
+            loginError.textContent = data.message || 'Invalid credentials';
             loginError.classList.remove('hidden');
         }
     } catch {
-        loginError.textContent = 'Błąd połączenia z serwerem';
+        loginError.textContent = 'Error connecting to server';
         loginError.classList.remove('hidden');
     }
 }
@@ -114,7 +111,6 @@ async function tryRefreshToken() {
             credentials: 'include'
         });
         if (res.status === 200) {
-            // Można pobrać username z backendu jeśli jest endpoint, tu zakładamy, że nie
             return true;
         }
     } catch {}
@@ -122,23 +118,25 @@ async function tryRefreshToken() {
 }
 
 // --- Logout ---
-logoutBtn.addEventListener('click', () => {
-    document.cookie = 'accessToken=; Max-Age=0; path=/;';
-    document.cookie = 'refreshToken=; Max-Age=0; path=/;';
+logoutBtn.addEventListener('click', async () => {
+    await fetch('/api/v1/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+    });
+
     location.reload();
 });
 
-// --- Show Chat UI ---
 function showChat() {
     authContainer.classList.add('hidden');
     chatContainer.classList.remove('hidden');
     currentUserSpan.textContent = username;
     messageInput.disabled = true;
     sendBtn.disabled = true;
-    // Inicjalizacja połączenia
+
     messageManager.setUsername(username);
     userListManager.setUsername(username);
-    connectionManager.setUsername(username);
+    connectionManager.setIdentifier(username);
     connectionManager.initializeWebSocketConnection();
 }
 
@@ -155,7 +153,7 @@ userListManager.setUpdateUICallback((hasSelectedUser) => {
     }
 });
 
-// --- Obsługa wysyłania wiadomości ---
+// --- Message sending logic ---
 sendBtn.addEventListener('click', (e) => {
     e.preventDefault();
     const message = messageInput.value.trim();
@@ -173,7 +171,7 @@ messageInput.addEventListener('keypress', (e) => {
     }
 });
 
-// --- Obsługa załączników ---
+// --- Attachments logic ---
 attachmentBtn.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', (event) => {
     if (event.target.files.length > 0) {
@@ -184,14 +182,14 @@ fileInput.addEventListener('change', (event) => {
     }
 });
 
-// --- Inicjalizacja na starcie ---
 (async function init() {
-    // Spróbuj odświeżyć token (jeśli user już zalogowany)
     if (await tryRefreshToken()) {
-        // Można pobrać username z backendu jeśli jest endpoint, tu zakładamy, że nie
-        // Wymuś wpisanie loginu jeśli nie ma username w cookie
-        authContainer.classList.remove('hidden');
-        chatContainer.classList.add('hidden');
+        const res = await fetch('/api/v1/auth/get-user-details', {
+            method: 'GET',
+        });
+
+        username = (await res.json()).identifier;
+        showChat();
     } else {
         authContainer.classList.remove('hidden');
         chatContainer.classList.add('hidden');

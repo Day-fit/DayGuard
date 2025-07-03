@@ -5,10 +5,11 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import pl.dayfit.dayguard.Entities.User;
 
+import java.security.Principal;
 import java.util.Collection;
 
 @RequiredArgsConstructor
-public class UserDetailsImplementation implements UserDetails {
+public class UserDetailsImplementation implements UserDetails, Principal {
     private final User user;
 
     @Override
@@ -29,5 +30,10 @@ public class UserDetailsImplementation implements UserDetails {
     public Long getId()
     {
         return user.getId();
+    }
+
+    @Override
+    public String getName() {
+        return user.getUsername();
     }
 }

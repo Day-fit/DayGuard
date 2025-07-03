@@ -1,6 +1,6 @@
 package pl.dayfit.dayguard.POJOs.Messages;
 
-public enum ActivitiesType {
+public enum ActivityType {
     JOIN,
     LEAVE,
     IS_CONNECTED,

@@ -1,14 +1,16 @@
 package pl.dayfit.dayguard.Services.Auth.Jwt;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import pl.dayfit.dayguard.Entities.User;
 import pl.dayfit.dayguard.Events.SecretKeyRotatedEvent;
 import pl.dayfit.dayguard.Helpers.KeyLocator;
+import pl.dayfit.dayguard.Services.Cache.UserCacheService;
 
 import java.security.Key;
 import java.util.Date;
@@ -24,6 +26,7 @@ public class JwtService {
 
     private final JwtSecretKeyService secretKeyService;
     private final KeyLocator keyLocator;
+    private final UserCacheService userCacheService;
     private volatile Key currentSecretKey;
     private volatile int currentSecretKeyId;
 
@@ -51,6 +54,8 @@ public class JwtService {
      */
     public String generateToken(Long userId, long validityTime)
     {
+        User user = userCacheService.findById(userId);
+
         if (validityTime <= 0)
         {
             throw new IllegalArgumentException("validityTime parameter can not be smaller than zero!");
@@ -65,6 +70,8 @@ public class JwtService {
                 .and()
                 .signWith(currentSecretKey)
                 .subject(String.valueOf(userId))
+                .claim("username", user.getUsername())
+                .claim("roles", user.getRoles())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + validityTime))
                 .compact();
@@ -79,6 +86,18 @@ public class JwtService {
     public boolean isValidToken(String token, Integer userId)
     {
         return isOwner(token, userId) && isNotExpired(token);
+    }
+
+    public String getUsername(String token)
+    {
+        String username = extractClaims(token, claims -> claims.get("username", String.class));
+
+        if (username == null)
+        {
+            throw new IllegalArgumentException("Given token is invalid");
+        }
+
+        return username;
     }
 
     private boolean isOwner(String token, Integer userId)
@@ -102,12 +121,12 @@ public class JwtService {
             return false;
         }
 
-        return expiration.before(new Date());
+        return expiration.after(new Date());
     }
 
     public Long extractId(String token)
     {
-        String rawId = extractClaims(token, Claims::getIssuer);
+        String rawId = extractClaims(token, Claims::getSubject);
 
         if (rawId == null) {
             return null;
@@ -140,7 +159,7 @@ public class JwtService {
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
-        } catch (JwtException exception) {
+        } catch (Exception exception) {
             log.debug("Could not able to extract claims from JWT token");
             return null;
         }

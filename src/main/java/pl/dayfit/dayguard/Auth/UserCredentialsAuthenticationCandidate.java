@@ -2,11 +2,11 @@ package pl.dayfit.dayguard.Auth;
 
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 
-public class JwtAuthenticationCandidate extends AbstractAuthenticationToken {
+public class UserCredentialsAuthenticationCandidate extends AbstractAuthenticationToken {
     private final String identifier;
     private final String password;
 
-    public JwtAuthenticationCandidate(String identifier, String password)
+    public UserCredentialsAuthenticationCandidate(String identifier, String password)
     {
         super(null);
 
