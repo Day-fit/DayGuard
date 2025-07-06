@@ -1,8 +1,9 @@
 package pl.dayfit.dayguard.Controllers;
 
-import pl.dayfit.dayguard.DTOs.AttachmentMessageDTO;
-import pl.dayfit.dayguard.DTOs.MessageDTO;
-import pl.dayfit.dayguard.DTOs.TextMessageDTO;
+import lombok.extern.slf4j.Slf4j;
+import pl.dayfit.dayguard.DTOs.AttachmentMessageRequestDTO;
+import pl.dayfit.dayguard.DTOs.MessageRequestDTO;
+import pl.dayfit.dayguard.DTOs.TextMessageRequestDTO;
 import pl.dayfit.dayguard.Messages.AbstractMessage;
 import pl.dayfit.dayguard.Messages.AttachmentMessage;
 import pl.dayfit.dayguard.Messages.TextMessage;
@@ -21,12 +22,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @AllArgsConstructor
 public class MessageController {
 
     @MessageMapping("/publish")
-    public ResponseEntity<Map<String, String>> publishMessage(@RequestBody MessageDTO messageDto, Message<?> rawMessage)
+    public ResponseEntity<Map<String, String>> publishMessage(@RequestBody MessageRequestDTO messageDto, Message<?> rawMessage)
     {
         SimpMessageHeaderAccessor headerAccessor = SimpMessageHeaderAccessor.wrap(rawMessage);
 
@@ -35,7 +37,7 @@ public class MessageController {
 
         AbstractMessage message = null;
 
-        if (messageDto instanceof TextMessageDTO textMessageDTO)
+        if (messageDto instanceof TextMessageRequestDTO textMessageDTO)
         {
              message = TextMessage
                     .builder()
@@ -46,12 +48,12 @@ public class MessageController {
                     .build();
         }
 
-        else if (messageDto instanceof AttachmentMessageDTO attachmentMessageDTO)
+        else if (messageDto instanceof AttachmentMessageRequestDTO attachmentMessageRequestDTO)
         {
             message = AttachmentMessage
                     .builder()
                     .attachments(
-                            attachmentMessageDTO.getAttachments().stream().map(file ->
+                            attachmentMessageRequestDTO.getAttachments().stream().map(file ->
                                     {
                                         Attachment attachment;
 
@@ -72,18 +74,16 @@ public class MessageController {
                     )
                     .messageUuid(UUID.randomUUID())
                     .sender(username)
-                    .receiver(attachmentMessageDTO.getReceiver())
+                    .receiver(attachmentMessageRequestDTO.getReceiver())
                     .build();
         }
 
         if (message == null)
         {
-            throw new IllegalArgumentException("Message is incorrect");
+            throw new IllegalArgumentException("Message body is incorrect");
         }
 
         message.send();
         return ResponseEntity.ok(Map.of("message", "message sent successfully"));
     }
-
-
 }

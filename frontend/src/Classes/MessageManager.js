@@ -10,62 +10,113 @@ class MessageManager {
     }
 
     displayMessage(message) {
-        const messageArea = document.querySelector(".message-area");
-        const messageElement = document.createElement("div");
-
-        messageElement.classList.add("message", message.sender === this.username || message.fromMe ? "own-message" : "other-message");
-
+        const messageArea = document.getElementById('message-area');
+        const messageElement = document.createElement('div');
+        
+        const isOwnMessage = message.sender === this.username || message.fromMe;
         const time = message.date ? new Date(message.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        let attachmentsHTML = '';
-        if (message.attachments && message.attachments.length > 0) {
-            attachmentsHTML = '<div class="message-attachments">';
-
-            message.attachments.forEach(attachment => {
-                if (attachment.type && attachment.type.startsWith('image/')) {
-                    attachmentsHTML += `
-                <div class="attachment-item image" data-filename="${attachment.name}" data-type="${attachment.type}" data-content="${attachment.data}">
-                    <img src="data:${attachment.type};base64,${attachment.data}" alt="${attachment.name}" />
-                    <div class="attachment-name">${attachment.name}</div>
-                    <div class="download-icon"><i class="bx bx-download"></i></div>
-                </div>
-                `;
-                } else {
-                    attachmentsHTML += `
-                <div class="attachment-item file" data-filename="${attachment.name}" data-type="${attachment.type}" data-content="${attachment.data}">
-                    <div class="file-icon"><i class="bx bx-file"></i></div>
-                    <div class="attachment-name">${attachment.name}</div>
-                    <div class="download-icon"><i class="bx bx-download"></i></div>
-                </div>
-                `;
-                }
-            });
-
-            attachmentsHTML += '</div>';
-        }
-
-        messageElement.innerHTML = `
-        <div class="message-header">
-            <span class="sender">${message.sender}</span>
-            <span class="time">${time}</span>
-        </div>
-        <div class="message-content">${message.message}</div>
-        ${attachmentsHTML}
+        messageElement.className = `flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4 animate-slide-up`;
+        
+        const messageContent = document.createElement('div');
+        messageContent.className = `max-w-xs lg:max-w-md ${isOwnMessage ? 'order-2' : 'order-1'}`;
+        
+        // Message bubble
+        const bubble = document.createElement('div');
+        bubble.className = `message-bubble ${isOwnMessage ? 'message-own' : 'message-other'}`;
+        
+        // Message header (sender name and time)
+        const header = document.createElement('div');
+        header.className = `flex items-center justify-between mb-1 ${isOwnMessage ? 'text-primary-100' : 'text-secondary-600'}`;
+        header.innerHTML = `
+            <span class="text-xs font-medium">${message.sender}</span>
+            <span class="text-xs">${time}</span>
         `;
-
-        messageElement.querySelectorAll('.attachment-item').forEach(item => {
-            item.addEventListener('click', () => {
-                this.downloadAttachment(
-                    item.getAttribute('data-filename'),
-                    item.getAttribute('data-type'),
-                    item.getAttribute('data-content')
-                );
+        
+        // Message text content
+        const textContent = document.createElement('div');
+        textContent.className = 'whitespace-pre-wrap';
+        textContent.textContent = message.message || '';
+        
+        bubble.appendChild(header);
+        bubble.appendChild(textContent);
+        
+        // Handle attachments
+        if (message.attachments && message.attachments.length > 0) {
+            const attachmentsContainer = document.createElement('div');
+            attachmentsContainer.className = 'mt-3 space-y-2';
+            
+            message.attachments.forEach(attachment => {
+                const attachmentElement = this.createAttachmentElement(attachment);
+                attachmentsContainer.appendChild(attachmentElement);
             });
-        });
-
+            
+            bubble.appendChild(attachmentsContainer);
+        }
+        
+        messageContent.appendChild(bubble);
+        messageElement.appendChild(messageContent);
+        
+        // Add avatar for other messages
+        if (!isOwnMessage) {
+            const avatar = document.createElement('div');
+            avatar.className = 'user-avatar order-2 ml-3 flex-shrink-0';
+            avatar.textContent = message.sender.charAt(0).toUpperCase();
+            messageElement.appendChild(avatar);
+        }
+        
         messageArea.appendChild(messageElement);
-        messageArea.scrollTop = messageArea.scrollHeight;
+        this.scrollToBottom(messageArea);
+    }
+
+    createAttachmentElement(attachment) {
+        const attachmentDiv = document.createElement('div');
+        attachmentDiv.className = 'attachment-item cursor-pointer hover:bg-secondary-50 transition-colors duration-200';
+        attachmentDiv.setAttribute('data-filename', attachment.name);
+        attachmentDiv.setAttribute('data-type', attachment.type);
+        attachmentDiv.setAttribute('data-content', attachment.data);
+        
+        if (attachment.type && attachment.type.startsWith('image/')) {
+            attachmentDiv.innerHTML = `
+                <div class="relative group">
+                    <img src="data:${attachment.type};base64,${attachment.data}" 
+                         alt="${attachment.name}" 
+                         class="w-full h-32 object-cover rounded-lg border border-secondary-200" />
+                    <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
+                        <div class="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <i class="bx bx-download text-white text-2xl"></i>
+                        </div>
+                    </div>
+                    <div class="mt-1 text-xs text-secondary-600 truncate">${attachment.name}</div>
+                </div>
+            `;
+        } else {
+            attachmentDiv.innerHTML = `
+                <div class="flex items-center gap-3 p-3 bg-secondary-50 rounded-lg border border-secondary-200">
+                    <div class="w-10 h-10 bg-secondary-200 rounded-lg flex items-center justify-center">
+                        <i class="bx bx-file text-xl text-secondary-600"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-secondary-900 truncate">${attachment.name}</div>
+                        <div class="text-xs text-secondary-500">${this.formatFileSize(attachment.size)}</div>
+                    </div>
+                    <button class="text-primary-600 hover:text-primary-700">
+                        <i class="bx bx-download text-lg"></i>
+                    </button>
+                </div>
+            `;
+        }
+        
+        attachmentDiv.addEventListener('click', () => {
+            this.downloadAttachment(
+                attachmentDiv.getAttribute('data-filename'),
+                attachmentDiv.getAttribute('data-type'),
+                attachmentDiv.getAttribute('data-content')
+            );
+        });
+        
+        return attachmentDiv;
     }
 
     downloadAttachment(filename, mimetype, base64Data) {
@@ -75,8 +126,8 @@ class MessageManager {
 
             for (let offset = 0; offset < byteCharacters.length; offset += 512) {
                 const slice = byteCharacters.slice(offset, offset + 512);
-
                 const byteNumbers = new Array(slice.length);
+                
                 for (let i = 0; i < slice.length; i++) {
                     byteNumbers[i] = slice.charCodeAt(i);
                 }
@@ -86,11 +137,11 @@ class MessageManager {
             }
 
             const blob = new Blob(byteArrays, { type: mimetype });
-
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
             link.download = filename;
+            link.style.display = 'none';
 
             document.body.appendChild(link);
             link.click();
@@ -101,8 +152,16 @@ class MessageManager {
             }, 100);
         } catch (error) {
             console.error('Download failed:', error);
-            alert('Failed to download the file. Please try again.');
+            this.showNotification('Failed to download the file. Please try again.', 'error');
         }
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
     storeMessage(message) {
@@ -123,7 +182,7 @@ class MessageManager {
     }
 
     loadUserMessages(user) {
-        const messageArea = document.querySelector(".message-area");
+        const messageArea = document.getElementById('message-area');
         messageArea.innerHTML = '';
 
         if (this.userMessages[user]) {
@@ -136,17 +195,28 @@ class MessageManager {
     clearMessages() {
         this.userMessages = {};
         this.unreadCounts = {};
-        document.querySelector(".message-area").innerHTML = '';
+        const messageArea = document.getElementById('message-area');
+        messageArea.innerHTML = '';
+        
+        // Show no user selected state
+        const noUserSelected = document.getElementById('no-user-selected');
+        if (noUserSelected) {
+            noUserSelected.classList.remove('hidden');
+        }
     }
 
     displayStatusMessage(text) {
-        const messageArea = document.querySelector(".message-area");
-        const statusElement = document.createElement("div");
-        statusElement.classList.add("status-message");
-        statusElement.textContent = text;
-
+        const messageArea = document.getElementById('message-area');
+        const statusElement = document.createElement('div');
+        statusElement.className = 'flex justify-center my-4 animate-fade-in';
+        
+        const statusContent = document.createElement('div');
+        statusContent.className = 'status-message bg-secondary-100 px-4 py-2 rounded-full text-secondary-600 text-sm';
+        statusContent.textContent = text;
+        
+        statusElement.appendChild(statusContent);
         messageArea.appendChild(statusElement);
-        messageArea.scrollTop = messageArea.scrollHeight;
+        this.scrollToBottom(messageArea);
     }
 
     getUserUnreadCount(user) {
@@ -156,4 +226,40 @@ class MessageManager {
     clearUserUnreadCount(user) {
         this.unreadCounts[user] = 0;
     }
+
+    scrollToBottom(element) {
+        setTimeout(() => {
+            element.scrollTop = element.scrollHeight;
+        }, 100);
+    }
+
+    showNotification(message, type = 'info') {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm animate-slide-up`;
+        
+        const bgColor = type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : 'bg-primary-500';
+        notification.className += ` ${bgColor} text-white`;
+        
+        notification.innerHTML = `
+            <div class="flex items-center gap-3">
+                <i class="bx ${type === 'error' ? 'bx-error' : type === 'success' ? 'bx-check' : 'bx-info-circle'} text-xl"></i>
+                <span>${message}</span>
+                <button onclick="this.parentElement.parentElement.remove()" class="ml-auto text-white hover:text-gray-200">
+                    <i class="bx bx-x text-lg"></i>
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 5000);
+    }
 }
+
+export default MessageManager;

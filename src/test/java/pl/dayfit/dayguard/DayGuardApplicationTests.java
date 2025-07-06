@@ -9,5 +9,4 @@ class DayGuardApplicationTests {
     @Test
     void contextLoads() {
     }
-
 }

@@ -48,8 +48,6 @@ public class SecurityConfiguration {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(
                         request -> {
-                            request.requestMatchers("/ws/**").permitAll();
-                            request.requestMatchers("/api/v1/auth/login").permitAll();
                             request.requestMatchers(securityProperties.getProtectedPaths().toArray(new String[0])).authenticated();
                             request.anyRequest().permitAll();
                         }
@@ -62,7 +60,7 @@ public class SecurityConfiguration {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
-        config.setAllowedOrigins(securityProperties.getAllowedOrigins());
+        config.setAllowedOriginPatterns(securityProperties.getAllowedOriginsPatterns());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
 

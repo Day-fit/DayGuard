@@ -12,6 +12,6 @@ import java.util.UUID;
 @SuperBuilder
 public abstract class AbstractMessage implements Sendable {
     protected UUID messageUuid;
-    protected String receiver;
     protected Instant timestamp;
+    public static MessageSender messageSender;
 }

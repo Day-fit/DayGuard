@@ -12,6 +12,6 @@ import java.util.List;
 @EnableConfigurationProperties
 @ConfigurationProperties(prefix = "security")
 public class SecurityPropertiesConfiguration {
-    private @Getter @Setter List<String> allowedOrigins;
+    private @Getter @Setter List<String> allowedOriginsPatterns;
     private @Getter @Setter List<String> protectedPaths;
 }

@@ -4,15 +4,11 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -123,6 +119,7 @@ public class AuthenticationController {
                 .secure(cookieProperties.isUsingSecuredCookies())
                 .sameSite(cookieProperties.getSameSitePolicy())
                 .httpOnly(true)
+                .path("/")
                 .build();
 
         response.addHeader(
@@ -143,6 +140,7 @@ public class AuthenticationController {
                 .secure(cookieProperties.isUsingSecuredCookies())
                 .sameSite(cookieProperties.getSameSitePolicy())
                 .httpOnly(true)
+                .path("/")
                 .maxAge(0)
                 .build();
 
@@ -153,6 +151,7 @@ public class AuthenticationController {
                 .secure(cookieProperties.isUsingSecuredCookies())
                 .sameSite(cookieProperties.getSameSitePolicy())
                 .httpOnly(true)
+                .path("/")
                 .maxAge(0)
                 .build();
 
@@ -167,11 +166,5 @@ public class AuthenticationController {
         );
 
         return ResponseEntity.ok(Map.of("message", "Logout ended successfully"));
-    }
-
-    @GetMapping("/api/v1/auth/get-user-details")
-    public ResponseEntity<?> getUserDetails(@AuthenticationPrincipal @NotNull UserDetails details)
-    {
-        return ResponseEntity.ok(userService.getUserDetailsDTO(details.getUsername()));
     }
 }

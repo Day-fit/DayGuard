@@ -1,13 +1,17 @@
 package pl.dayfit.dayguard.Services;
 
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
 import pl.dayfit.dayguard.DTOs.ActivityMessageDTO;
+import pl.dayfit.dayguard.DTOs.MessageResponseDTO;
+import pl.dayfit.dayguard.Events.UserReadyForMessagesEvent;
 import pl.dayfit.dayguard.Messages.AbstractMessage;
-import pl.dayfit.dayguard.Messages.DedicatedActivityMessage;
-import pl.dayfit.dayguard.POJOs.MQ.UserMQ;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
+import pl.dayfit.dayguard.Messages.DedicatedActivityMessage;
+import pl.dayfit.dayguard.Messages.MessageSender;
 import pl.dayfit.dayguard.POJOs.Messages.ActivityType;
 
 import java.time.Instant;
@@ -16,48 +20,55 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class MessagingService {
+public class MessagingService implements MessageSender {
     private final MQService mqService;
     private final RabbitTemplate rabbitTemplate;
 
-    public void publishMessage(AbstractMessage message) throws IllegalArgumentException
+    @PostConstruct
+    private void init()
     {
-        if (message.getReceiver() != null)
-        {
-
-            UserMQ receiver = mqService.getUser(message.getReceiver());
-
-            if (receiver != null)
-            {
-                rabbitTemplate.convertAndSend(
-                        receiver.getExchangePM().getName(),
-                        receiver.getRoutingKeyPM(),
-                        message
-                );
-
-                return;
-            }
-        }
-
-        throw new IllegalArgumentException("Receiver is null!");
+        AbstractMessage.messageSender = this;
     }
 
-    public void sendActivateUsersList(String receiverUsername)
+    @Override
+    public void publishMessage(MessageResponseDTO message, String receiver) throws IllegalArgumentException
     {
-        log.debug("Sending activate users list to users activity exchange");
+        if (receiver == null)
+        {
+            throw new IllegalArgumentException("Receiver cannot be null");
+        }
 
-        mqService.getUsersMQ().keySet().forEach(user ->
-                DedicatedActivityMessage.builder()
-                        .receiver(receiverUsername)
-                        .messageUuid(UUID.randomUUID())
-                        .timestamp(Instant.now())
-                        .type(ActivityType.IS_CONNECTED)
-                        .sendingService(this::sendActivityMessage)
-                        .build()
+        String routingKey = message instanceof ActivityMessageDTO ? MQService.ACTIVITY_PREFIX + receiver : MQService.MESSAGING_PM_PREFIX + receiver;
+
+        rabbitTemplate.convertAndSend(
+                routingKey,
+                message
         );
     }
 
-    private void sendActivityMessage(ActivityMessageDTO dto)
+    @Override
+    public void publishMessageFanout(MessageResponseDTO message) {
+        rabbitTemplate.convertAndSend(
+                mqService.getBroadcastExchange().getName(),
+                "", //fanout exchange, routing key is ignored
+                message
+        );
+    }
+
+    @EventListener
+    public void sendActivateUsersList(UserReadyForMessagesEvent event)
     {
+        log.debug("Sending activate users list to users activity exchange ...");
+
+        mqService.getActiveUsers().keySet().forEach(user ->
+                DedicatedActivityMessage.builder()
+                        .receiver(event.username())
+                        .targetUsername(user)
+                        .messageUuid(UUID.randomUUID())
+                        .timestamp(Instant.now())
+                        .type(ActivityType.IS_CONNECTED)
+                        .build()
+                        .send()
+        );
     }
 }
