@@ -1,5 +1,6 @@
 package pl.dayfit.dayguard.DTOs;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -11,7 +12,7 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TextMessageRequestDTO extends MessageRequestDTO{
-    private String receiver;
+public class TextMessageRequestDTO extends MessageRequestDTO {
+    @NotBlank(message = "Message cannot be blank")
     private String message;
 }

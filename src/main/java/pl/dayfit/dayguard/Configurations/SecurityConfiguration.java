@@ -3,6 +3,8 @@ package pl.dayfit.dayguard.Configurations;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.owasp.html.PolicyFactory;
+import org.owasp.html.Sanitizers;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -13,6 +15,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -43,6 +46,12 @@ public class SecurityConfiguration {
     public SecurityFilterChain securityFilterChain(HttpSecurity http, CookieJwtFilter cookieJwtFilter) throws Exception
     {
         return http
+                .headers(headers ->
+                    headers
+                            .contentSecurityPolicy(policy -> policy
+                                    .policyDirectives("default-src 'self'; script-src 'self'; object-src 'none'"))
+                            .addHeaderWriter(new StaticHeadersWriter("Sec-Fetch-Site","same-origin"))
+                )
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable) //CSRF attack is not a possible cause of same-site policy, httpOnly cookies, etc.
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -73,5 +82,11 @@ public class SecurityConfiguration {
     public PasswordEncoder passwordEncoder()
     {
         return new BCryptPasswordEncoder(12);
+    }
+
+    @Bean
+    public PolicyFactory policyFactory()
+    {
+        return Sanitizers.FORMATTING.and(Sanitizers.LINKS);
     }
 }

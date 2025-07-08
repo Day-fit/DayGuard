@@ -1,3 +1,5 @@
+import DOMPurify from 'dompurify';
+
 class MessageManager {
     constructor() {
         this.username = '';
@@ -17,10 +19,16 @@ class MessageManager {
         const time = message.date ? new Date(message.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        messageElement.className = `flex ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4 animate-slide-up`;
-        
+        messageElement.className = `flex items-start ${isOwnMessage ? 'justify-end' : 'justify-start'} mb-4 animate-slide-up`;
+
+        // Avatar (always on the left)
+        const avatar = document.createElement('div');
+        avatar.className = 'user-avatar flex-shrink-0 mr-3';
+        avatar.textContent = DOMPurify.sanitize(message.sender.charAt(0).toUpperCase());
+        messageElement.appendChild(avatar);
+
         const messageContent = document.createElement('div');
-        messageContent.className = `max-w-xs lg:max-w-md ${isOwnMessage ? 'order-2' : 'order-1'}`;
+        messageContent.className = `max-w-xs lg:max-w-md`;
         
         // Message bubble
         const bubble = document.createElement('div');
@@ -28,16 +36,16 @@ class MessageManager {
         
         // Message header (sender name and time)
         const header = document.createElement('div');
-        header.className = `flex items-center justify-between mb-1 ${isOwnMessage ? 'text-primary-100' : 'text-secondary-600'}`;
+        header.className = `flex items-center mb-1 ${isOwnMessage ? 'text-primary-100' : 'text-secondary-600'}`;
         header.innerHTML = `
-            <span class="text-xs font-medium">${message.sender}</span>
+            <span class="text-xs font-medium mr-2">${DOMPurify.sanitize(message.sender)}</span>
             <span class="text-xs">${time}</span>
         `;
         
         // Message text content
         const textContent = document.createElement('div');
         textContent.className = 'whitespace-pre-wrap';
-        textContent.textContent = message.message || '';
+        textContent.textContent = message.message ? DOMPurify.sanitize(message.message) : '';
         
         bubble.appendChild(header);
         bubble.appendChild(textContent);
@@ -58,14 +66,6 @@ class MessageManager {
         messageContent.appendChild(bubble);
         messageElement.appendChild(messageContent);
         
-        // Add avatar for other messages
-        if (!isOwnMessage) {
-            const avatar = document.createElement('div');
-            avatar.className = 'user-avatar order-2 ml-3 flex-shrink-0';
-            avatar.textContent = message.sender.charAt(0).toUpperCase();
-            messageElement.appendChild(avatar);
-        }
-        
         messageArea.appendChild(messageElement);
         this.scrollToBottom(messageArea);
     }
@@ -73,22 +73,22 @@ class MessageManager {
     createAttachmentElement(attachment) {
         const attachmentDiv = document.createElement('div');
         attachmentDiv.className = 'attachment-item cursor-pointer hover:bg-secondary-50 transition-colors duration-200';
-        attachmentDiv.setAttribute('data-filename', attachment.name);
-        attachmentDiv.setAttribute('data-type', attachment.type);
+        attachmentDiv.setAttribute('data-filename', DOMPurify.sanitize(attachment.name));
+        attachmentDiv.setAttribute('data-type', DOMPurify.sanitize(attachment.type));
         attachmentDiv.setAttribute('data-content', attachment.data);
         
         if (attachment.type && attachment.type.startsWith('image/')) {
             attachmentDiv.innerHTML = `
                 <div class="relative group">
-                    <img src="data:${attachment.type};base64,${attachment.data}" 
-                         alt="${attachment.name}" 
+                    <img src="data:${DOMPurify.sanitize(attachment.type)};base64,${attachment.data}" 
+                         alt="${DOMPurify.sanitize(attachment.name)}" 
                          class="w-full h-32 object-cover rounded-lg border border-secondary-200" />
                     <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
                         <div class="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                             <i class="bx bx-download text-white text-2xl"></i>
                         </div>
                     </div>
-                    <div class="mt-1 text-xs text-secondary-600 truncate">${attachment.name}</div>
+                    <div class="mt-1 text-xs text-secondary-600 truncate">${DOMPurify.sanitize(attachment.name)}</div>
                 </div>
             `;
         } else {
@@ -98,7 +98,7 @@ class MessageManager {
                         <i class="bx bx-file text-xl text-secondary-600"></i>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <div class="text-sm font-medium text-secondary-900 truncate">${attachment.name}</div>
+                        <div class="text-sm font-medium text-secondary-900 truncate">${DOMPurify.sanitize(attachment.name)}</div>
                         <div class="text-xs text-secondary-500">${this.formatFileSize(attachment.size)}</div>
                     </div>
                     <button class="text-primary-600 hover:text-primary-700">

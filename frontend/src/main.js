@@ -1,6 +1,9 @@
 import ConnectionManager from './Classes/ConnectionManager.js';
 import MessageManager from './Classes/MessageManager.js';
 import UserListManager from './Classes/UserListManager.js';
+import DOMPurify from 'dompurify';
+import validator from 'validator';
+import zxcvbn from 'zxcvbn';
 
 // Initialize managers
 const messageManager = new MessageManager();
@@ -40,6 +43,7 @@ const sidebar = document.getElementById('sidebar');
 const mobileOverlay = document.getElementById('mobile-overlay');
 
 let username = null;
+let email = null;
 let isTyping = false;
 let typingTimeout = null;
 
@@ -48,19 +52,20 @@ let typingTimeout = null;
     showLoading();
     
     try {
-        if (await tryRefreshToken()) {
-            const res = await fetch('/api/v1/get-user-details', {
-                method: 'GET',
-                credentials: 'include'
-            });
+        // First try to refresh the token
+        const tokenRefreshed = await tryRefreshToken();
+        
+        // Then try to get user details (regardless of token refresh result)
+        const res = await fetch('/api/v1/get-user-details', {
+            method: 'GET',
+            credentials: 'include'
+        });
 
-            if (res.ok) {
-                const userData = await res.json();
-                username = userData.username;
-                showChat();
-            } else {
-                showAuth();
-            }
+        if (res.ok) {
+            const userData = await res.json();
+            username = userData.username;
+            email = userData.email;
+            showChat();
         } else {
             showAuth();
         }
@@ -144,10 +149,31 @@ registerForm.addEventListener('submit', async (e) => {
     hideErrors();
     
     const formData = new FormData(registerForm);
-    const regUsername = formData.get('register-username').trim();
-    const regEmail = formData.get('register-email').trim();
-    const regPassword = formData.get('register-password');
-    
+    let regUsername = formData.get('register-username').trim();
+    let regEmail = formData.get('register-email').trim();
+    let regPassword = formData.get('register-password');
+
+    // Sanitize inputs
+    regUsername = DOMPurify.sanitize(regUsername);
+    regEmail = DOMPurify.sanitize(regEmail);
+    regPassword = DOMPurify.sanitize(regPassword);
+
+    // Validate email
+    if (!validateEmail(regEmail)) {
+        showError(registerError, 'Invalid email address.');
+        return;
+    }
+    // Validate username (alphanumeric, 3-20 chars)
+    if (!validateUsername(regUsername)) {
+        showError(registerError, 'Username must be 3-20 alphanumeric characters.');
+        return;
+    }
+    // Validate password
+    if (!validatePassword(regPassword)) {
+        showError(registerError, 'Password is too weak. Use at least 8 characters and a mix of types.');
+        return;
+    }
+
     try {
         const res = await fetch('/api/v1/auth/register', {
             method: 'POST',
@@ -166,15 +192,70 @@ registerForm.addEventListener('submit', async (e) => {
     }
 });
 
+// Password strength meter for registration
+const registerPasswordInput = document.getElementById('register-password');
+const passwordStrengthBar = document.getElementById('password-strength-bar');
+const passwordStrengthLabel = document.getElementById('password-strength-label');
+
+if (registerPasswordInput) {
+    registerPasswordInput.addEventListener('input', (e) => {
+        const value = e.target.value;
+        if (!value) {
+            passwordStrengthBar.style.width = '0%';
+            passwordStrengthBar.className = 'h-2 rounded bg-red-400 transition-all duration-300';
+            passwordStrengthLabel.textContent = '';
+            return;
+        }
+        const result = zxcvbn(value);
+        let width = '0%';
+        let color = 'bg-red-400';
+        let label = '';
+        switch (result.score) {
+            case 0:
+                width = '20%';
+                color = 'bg-red-400';
+                label = 'Very Weak';
+                break;
+            case 1:
+                width = '40%';
+                color = 'bg-orange-400';
+                label = 'Weak';
+                break;
+            case 2:
+                width = '60%';
+                color = 'bg-yellow-400';
+                label = 'Fair';
+                break;
+            case 3:
+                width = '80%';
+                color = 'bg-blue-400';
+                label = 'Good';
+                break;
+            case 4:
+                width = '100%';
+                color = 'bg-green-500';
+                label = 'Strong';
+                break;
+        }
+        passwordStrengthBar.style.width = width;
+        passwordStrengthBar.className = `h-2 rounded transition-all duration-300 ${color}`;
+        passwordStrengthLabel.textContent = label;
+    });
+}
+
 // Login form
 loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     hideErrors();
     
     const formData = new FormData(loginForm);
-    const logIdentifier = formData.get('login-identifier').trim();
-    const logPassword = formData.get('login-password');
-    
+    let logIdentifier = formData.get('login-identifier').trim();
+    let logPassword = formData.get('login-password');
+
+    // Sanitize inputs
+    logIdentifier = DOMPurify.sanitize(logIdentifier);
+    logPassword = DOMPurify.sanitize(logPassword);
+
     await loginUser(logIdentifier, logPassword);
 });
 
@@ -188,8 +269,22 @@ async function loginUser(identifier, password) {
         });
         
         if (res.ok) {
-            username = identifier;
-            showChat();
+            // Get user details after successful login
+            const userRes = await fetch('/api/v1/get-user-details', {
+                method: 'GET',
+                credentials: 'include'
+            });
+            
+            if (userRes.ok) {
+                const userData = await userRes.json();
+                username = userData.username;
+                email = userData.email;
+                showChat();
+            } else {
+                // Fallback to identifier if user details fail
+                username = identifier;
+                showChat();
+            }
         } else {
             const data = await res.json();
             showError(loginError, data.message || 'Invalid credentials');
@@ -274,7 +369,7 @@ messageInput.addEventListener('input', () => {
 });
 
 function sendMessage() {
-    const message = messageInput.value.trim();
+    const message = DOMPurify.sanitize(messageInput.value.trim());
     if (connectionManager.sendMessage(message)) {
         messageInput.value = '';
         messageInput.style.height = 'auto';
@@ -288,10 +383,9 @@ attachmentBtn.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', (event) => {
     if (event.target.files.length > 0) {
         Array.from(event.target.files).forEach(file => {
-            connectionManager.addAttachment(file);
+            connectionManager.addAttachment(file, showAttachmentPreview);
         });
         event.target.value = '';
-        showAttachmentPreview();
     }
 });
 
@@ -376,4 +470,17 @@ window.addEventListener('resize', () => {
     }
 });
 
+// Validation helpers for unit testing
+export function validateEmail(email) {
+    return validator.isEmail(email) && validator.isLength(email, { min: 6, max: 254 });
+}
 
+export function validateUsername(username) {
+    return validator.isAlphanumeric(username) && validator.isLength(username, { min: 3, max: 20 });
+}
+
+export function validatePassword(password) {
+    const pwStrength = zxcvbn(password);
+    if (password.length < 8 || pwStrength.score < 2) return false;
+    return password.length <= 64;
+}

@@ -1,14 +1,15 @@
 package pl.dayfit.dayguard.DTOs.Auth;
 
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Builder;
 import lombok.Getter;
 
 @Getter
 @Builder
 public class LoginDTO {
-    @NotNull
+    @NotBlank(message = "Identifier cannot be blank")
     private String identifier;
-    @NotNull
+
+    @NotBlank(message = "Password cannot be blank")
     private String password;
 }

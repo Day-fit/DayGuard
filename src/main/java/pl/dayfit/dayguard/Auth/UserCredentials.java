@@ -9,7 +9,7 @@ import java.security.Principal;
 import java.util.Collection;
 
 @RequiredArgsConstructor
-public class UserDetailsImplementation implements UserDetails, Principal {
+public class UserCredentials implements UserDetails, Principal {
     private final User user;
 
     @Override

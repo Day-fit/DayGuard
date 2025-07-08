@@ -1,25 +1,26 @@
 package pl.dayfit.dayguard.Auth;
 
 import org.springframework.security.authentication.AbstractAuthenticationToken;
-import org.springframework.security.core.userdetails.UserDetails;
+
+import java.security.Principal;
 
 public class JwtAuthenticationToken extends AbstractAuthenticationToken {
     private final String accessToken;
-    private final UserDetails userDetails;
+    private final Principal principal;
 
     public JwtAuthenticationToken(String accessToken)
     {
         super(null);
         this.accessToken = accessToken;
-        this.userDetails = null;
+        this.principal = null;
         setAuthenticated(false);
     }
 
-    public JwtAuthenticationToken(UserDetails userDetails)
+    public JwtAuthenticationToken(JwtPrincipal principal)
     {
-        super(userDetails.getAuthorities());
+        super(principal.userDetails().getAuthorities());
         this.accessToken = null;
-        this.userDetails = userDetails;
+        this.principal = principal;
         setAuthenticated(true);
     }
 
@@ -30,6 +31,6 @@ public class JwtAuthenticationToken extends AbstractAuthenticationToken {
 
     @Override
     public Object getPrincipal() {
-        return userDetails;
+        return principal;
     }
 }

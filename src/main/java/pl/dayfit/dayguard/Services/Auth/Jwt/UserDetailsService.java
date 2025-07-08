@@ -3,7 +3,7 @@ package pl.dayfit.dayguard.Services.Auth.Jwt;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
-import pl.dayfit.dayguard.Auth.UserDetailsImplementation;
+import pl.dayfit.dayguard.Auth.UserCredentials;
 import pl.dayfit.dayguard.Entities.User;
 import pl.dayfit.dayguard.Services.Cache.UserCacheService;
 
@@ -20,8 +20,8 @@ public class UserDetailsService implements org.springframework.security.core.use
      * @throws UsernameNotFoundException if no user with the given identifier exists
      */
     @Override
-    public UserDetailsImplementation loadUserByUsername(String identifier) throws UsernameNotFoundException {
+    public UserCredentials loadUserByUsername(String identifier) throws UsernameNotFoundException {
         User user = cacheService.findByEmailOrUsername(identifier);
-        return new UserDetailsImplementation(user);
+        return new UserCredentials(user);
     }
 }

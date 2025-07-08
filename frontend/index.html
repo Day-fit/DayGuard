@@ -81,6 +81,12 @@
               <i class="bx bx-lock mr-1"></i>Password
             </label>
             <input id="register-password" name="register-password" type="password" required class="input-field" placeholder="Create a password" autocomplete="new-password">
+            <div class="mt-2">
+              <div class="w-full bg-secondary-100 rounded h-2">
+                <div id="password-strength-bar" class="h-2 rounded bg-red-400 transition-all duration-300" style="width: 0%"></div>
+              </div>
+              <div id="password-strength-label" class="text-xs mt-1 text-secondary-600"></div>
+            </div>
           </div>
           <button type="submit" class="btn-primary w-full">
             <i class="bx bx-user-plus mr-2"></i>Create Account

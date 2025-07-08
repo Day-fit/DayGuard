@@ -1,5 +1,6 @@
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import DOMPurify from 'dompurify';
 
 class ConnectionManager {
     constructor(messageManager, userListManager) {
@@ -7,15 +8,15 @@ class ConnectionManager {
         this.userListManager = userListManager;
         this.stompClient = null;
         this.attachments = [];
-        this.identifier = '';
+        this.username = '';
         this.isConnected = false;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
         this.reconnectDelay = 1000;
     }
 
-    setIdentifier(identifier) {
-        this.identifier = identifier;
+    setIdentifier(username) {
+        this.username = username;
     }
 
     initializeWebSocketConnection() {
@@ -64,7 +65,7 @@ class ConnectionManager {
     async setupSubscriptions() {
         // Subscribe to personal messages
         this.stompClient.subscribe(
-            `/user/${this.identifier}/queue/messages`,
+            `/user/${this.username}/queue/messages`,
             (message) => {
                 try {
                     const msg = JSON.parse(message.body);
@@ -97,7 +98,7 @@ class ConnectionManager {
 
         // Subscribe to user activities
         this.stompClient.subscribe(
-            `/user/${this.identifier}/queue/activities`,
+            `/user/${this.username}/queue/activities`,
             (message) => {
                 try {
                     const data = JSON.parse(message.body);
@@ -107,28 +108,32 @@ class ConnectionManager {
                 }
             }
         );
+
+        // Subscribe to error queue
+        this.stompClient.subscribe(
+            `/user/${this.username}/queue/errors`,
+            (message) => {
+                try {
+                    const data = JSON.parse(message.body);
+                    if (data && data.error) {
+                        this.showNotification(DOMPurify.sanitize(data.error), 'error');
+                    }
+                } catch (error) {
+                    console.error('Error processing error queue message:', error);
+                }
+            }
+        );
     }
 
     async notifyServerReady() {
         try {
-            // Send connection ready message via STOMP
+            // Ping Server
             this.stompClient.publish({
                 destination: '/app/connection-ready',
-                body: JSON.stringify({}),
+                body: JSON.stringify(this.username),
                 headers: { 'content-type': 'application/json' }
             });
 
-            // Also ping the REST endpoint
-            const response = await fetch("/api/v1/connection-ready", {
-                method: "GET",
-                credentials: 'include'
-            });
-            
-            if (response.ok) {
-                console.log("Server connection confirmed");
-            } else {
-                console.warn("Server connection check failed");
-            }
         } catch (error) {
             console.error("Error notifying server:", error);
         }
@@ -152,7 +157,7 @@ class ConnectionManager {
         }
     }
 
-    addAttachment(file) {
+    addAttachment(file, callback) {
         // Validate file size (max 10MB)
         const maxSize = 10 * 1024 * 1024; // 10MB
         if (file.size > maxSize) {
@@ -182,6 +187,7 @@ class ConnectionManager {
                 name: file.name,
                 size: file.size
             });
+            if (callback) callback();
         };
 
         reader.onerror = () => {
@@ -204,6 +210,9 @@ class ConnectionManager {
         const selectedReceiver = this.userListManager.getSelectedReceiver();
 
         if ((!message && this.attachments.length === 0) || !selectedReceiver) {
+            if (!selectedReceiver) {
+                this.showNotification('Please select a user to chat with first', 'warning');
+            }
             return false;
         }
 
@@ -212,53 +221,88 @@ class ConnectionManager {
             return false;
         }
 
-        let chatMessage;
+        let messagesSent = 0;
+        const totalMessages = (message ? 1 : 0) + (this.attachments.length > 0 ? 1 : 0);
 
+        // Send text message first if it exists
+        if (message && message.trim()) {
+            const textMessage = {
+                receiver: selectedReceiver,
+                message: message.trim()
+            };
+
+            console.log('Sending text message:', textMessage);
+
+            try {
+                this.stompClient.publish({
+                    destination: "/app/publish/text",
+                    body: JSON.stringify(textMessage),
+                    headers: { 'content-type': 'application/json' }
+                });
+
+                // Create a local message for display
+                const outgoingTextMessage = {
+                    sender: this.username,
+                    receiver: selectedReceiver,
+                    message: message.trim(),
+                    attachments: null,
+                    fromMe: true
+                };
+
+                this.messageManager.storeMessage(outgoingTextMessage);
+                this.messageManager.displayMessage(outgoingTextMessage);
+                messagesSent++;
+            } catch (error) {
+                console.error('Error sending text message:', error);
+                this.showNotification('Failed to send text message', 'error');
+                return false;
+            }
+        }
+
+        // Send attachments if they exist
         if (this.attachments.length > 0) {
-            // Create AttachmentMessageRequestDTO structure
-            chatMessage = {
+            const attachmentMessage = {
                 receiver: selectedReceiver,
                 attachments: this.attachments.map(attachment => ({
                     name: attachment.name,
-                    contentType: attachment.type,
-                    bytes: attachment.data,
+                    data: attachment.data,
+                    type: attachment.type,
                     size: attachment.size
                 }))
             };
-        } else {
-            // Create TextMessageRequestDTO structure
-            chatMessage = {
-                receiver: selectedReceiver,
-                message: message || ""
-            };
+
+            console.log('Sending attachment message:', attachmentMessage);
+
+            try {
+                this.stompClient.publish({
+                    destination: "/app/publish/attachment",
+                    body: JSON.stringify(attachmentMessage),
+                    headers: { 'content-type': 'application/json' }
+                });
+
+                // Create a local message for display
+                const outgoingAttachmentMessage = {
+                    sender: this.username,
+                    receiver: selectedReceiver,
+                    message: "",
+                    attachments: this.attachments,
+                    fromMe: true
+                };
+
+                this.messageManager.storeMessage(outgoingAttachmentMessage);
+                this.messageManager.displayMessage(outgoingAttachmentMessage);
+                messagesSent++;
+            } catch (error) {
+                console.error('Error sending attachment message:', error);
+                this.showNotification('Failed to send attachment message', 'error');
+                return false;
+            }
         }
 
-        try {
-            this.stompClient.publish({
-                destination: '/app/publish',
-                body: JSON.stringify(chatMessage),
-                headers: { 'content-type': 'application/json' }
-            });
-
-            // Create local message for display
-            const outgoingMessage = {
-                sender: this.identifier,
-                receiver: selectedReceiver,
-                message: message || "",
-                attachments: this.attachments.length > 0 ? this.attachments : null,
-                fromMe: true
-            };
-
-            this.messageManager.storeMessage(outgoingMessage);
-            this.messageManager.displayMessage(outgoingMessage);
-
-            this.clearAttachments();
-            return true;
-        } catch (error) {
-            console.error('Error sending message:', error);
-            this.showNotification('Failed to send message', 'error');
-            return false;
-        }
+        // Clear attachments after successful sending
+        this.clearAttachments();
+        
+        return messagesSent === totalMessages;
     }
 
     disconnect() {

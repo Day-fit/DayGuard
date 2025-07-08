@@ -23,7 +23,7 @@ public class UserCredentialsAuthenticationProvider implements AuthenticationProv
     @Override
     public Authentication authenticate(Authentication authentication) throws AuthenticationException {
         UserCredentialsAuthenticationCandidate candidate = (UserCredentialsAuthenticationCandidate) authentication;
-        UserDetailsImplementation userDetails = userDetailsService.loadUserByUsername((String) candidate.getPrincipal());
+        UserCredentials userDetails = userDetailsService.loadUserByUsername((String) candidate.getPrincipal());
 
         if (!passwordEncoder.matches((String) candidate.getCredentials(), userDetails.getPassword()))
         {
