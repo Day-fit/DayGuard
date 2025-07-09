@@ -24,6 +24,7 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
       - ./ssl/:/etc/nginx/ssl/
+      - /home/deploy/app/:/home/deploy/app:ro
     environment:
       - 'DOMAIN_NAME=${DOMAIN_NAME}'
     ports:
