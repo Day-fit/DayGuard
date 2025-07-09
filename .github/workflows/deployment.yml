@@ -65,7 +65,7 @@ jobs:
         run: npm ci
 
       - name: Build frontend
-        run: npm run build --mode production
+        run: npm run build
 
       - name: Write SSH key to file
         run: |

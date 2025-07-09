@@ -5,18 +5,6 @@ COPY pom.xml app/pom.xml
 
 WORKDIR /app
 
-### Update the system and install dependencies
-RUN dnf update -y && \
-    curl -sL https://rpm.nodesource.com/setup_22.x | bash - && \
-    dnf install -y nodejs
-
-RUN cd src/main/resources/static && \
-    npm install && \
-    npx vite build && \
-    mkdir -p assets && \
-    cp -r dist/assets/* assets/ && \
-    cp dist/index.html ./index.html
-
 ### Compile the project
 RUN \
     mvn clean package -DskipTests && \
