@@ -73,4 +73,4 @@ jobs:
           chmod 600 /tmp/deploy_key
 
       - name: Deploy to production
-        run: rsync -avz --delete -e "ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no" ./dist/ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/deploy/app/
+        run: rsync -avz --delete -e "ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no" /dist/ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/deploy/app/
