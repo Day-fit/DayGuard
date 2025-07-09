@@ -51,6 +51,7 @@ services:
       - '15672:15672'
     profiles:
       - dev
+      - test
 
   postgres:
     image: 'rapidfort/postgresql-official:17.4-alpine3.20'
@@ -72,14 +73,29 @@ services:
     image: postgres:15
     environment:
       - POSTGRES_DB=dayguard
-      - POSTGRES_USER=myuser
+      - POSTGRES_USER=user
       - POSTGRES_PASSWORD=secret
-    volumes:
-      - ./pgdata-dev:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - '5432:5432'
     labels:
       org.springframework.boot.service-connection: postgres
       org.springframework.boot.readiness-check.tcp.disable: false
     profiles:
       - dev
+
+  redis:
+    image: bitnami/redis:8.0.2
+    environment:
+      - 'REDIS_PASSWORD=${REDIS_PASSWORD}'
+    profiles:
+      - prod
+
+  redis-dev:
+    image: bitnami/redis:8.0.2
+    environment:
+      - 'REDIS_PASSWORD=secret'
+    ports:
+      - '6379:6379'
+    profiles:
+      - dev
+      - test
