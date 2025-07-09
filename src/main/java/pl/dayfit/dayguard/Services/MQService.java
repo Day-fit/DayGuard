@@ -113,7 +113,6 @@ public class MQService {
 
         rabbitAdmin.deleteQueue(MESSAGING_PM_PREFIX + user.getUsername());
         rabbitAdmin.deleteExchange(MESSAGING_PM_PREFIX + user.getUsername());
-
-        rabbitAdmin.deleteQueue(MESSAGING_PM_PREFIX + user.getUsername());
+        rabbitAdmin.deleteQueue(ACTIVITY_PREFIX + user.getUsername());
     }
 }
