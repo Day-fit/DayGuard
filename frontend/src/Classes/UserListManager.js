@@ -1,3 +1,5 @@
+import DOMPurify from 'dompurify';
+
 class UserListManager {
     constructor() {
         this.activeUsers = new Set();
@@ -91,7 +93,7 @@ class UserListManager {
                 userItem.classList.add('selected');
             }
 
-            const initials = user.charAt(0).toUpperCase();
+            const initials = DOMPurify.sanitize(user.charAt(0).toUpperCase());
             const hasUnread = this.messageDisplay.getUserUnreadCount(user) > 0;
             const unreadCount = this.messageDisplay.getUserUnreadCount(user);
 
@@ -102,7 +104,7 @@ class UserListManager {
                 </div>
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center justify-between">
-                        <span class="font-medium text-secondary-900 truncate">${user}</span>
+                        <span class="font-medium text-secondary-900 truncate">${DOMPurify.sanitize(user)}</span>
                         ${hasUnread ? `<span class="unread-badge">${unreadCount > 99 ? '99+' : unreadCount}</span>` : ''}
                     </div>
                     <div class="text-xs text-secondary-500">

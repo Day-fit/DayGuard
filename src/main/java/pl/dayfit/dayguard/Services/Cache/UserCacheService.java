@@ -25,9 +25,9 @@ public class UserCacheService {
                 @CachePut(value = "user", key = "#user.id")
         }
     )
-    public void save(User user)
+    public User save(User user)
     {
-        userRepository.save(user);
+        return userRepository.save(user);
     }
 
     /**
@@ -41,6 +41,20 @@ public class UserCacheService {
     {
         return userRepository.findByEmailOrUsername(identifier)
                 .orElseThrow(() -> new BadCredentialsException("Given credentials are incorrect"));
+    }
+
+    @Cacheable(value = "user", key = "#username")
+    public User findByUsername(String username)
+    {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new NoSuchElementException("No user with username " + username + " has been found"));
+    }
+
+    @Cacheable(value = "user", key = "#email")
+    public User findByEmail(String email)
+    {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new NoSuchElementException("No user with username " + email + " has been found"));
     }
 
     /**

@@ -13,11 +13,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     /**
      * Finds for user with username or email
-     * @param value param that is compared to username and email in a query
+     * @param identifier param that is compared to username and email in a query
      * @return Result of the query
      */
-    @Query("SELECT u FROM User u WHERE u.username = :value OR u.email = :value")
-    Optional<User> findByEmailOrUsername(String value);
+    @Query("SELECT u FROM User u WHERE u.username = :identifier OR u.email = :identifier")
+    Optional<User> findByEmailOrUsername(String identifier);
 
     boolean existsByEmailOrUsername(String email, String username);
+
+    Optional<User> findByEmail(String email);
 }

@@ -1,15 +1,13 @@
 package pl.dayfit.dayguard.DTOs.Auth;
 
 import jakarta.validation.constraints.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 public class RegisterDTO {
     @NotBlank(message = "Email cannot be blank")
     @Size(max = 254, min = 6, message = "Email must be in range of 6-254 characters")
