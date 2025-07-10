@@ -1,8 +1,7 @@
 services:
-  spring-backend:
-    build:
-      context: .
-      dockerfile: './dockerfiles/backend/Dockerfile'
+  dayguard-core:
+    image: 'ghcr.io/day-fit/dayguard:latest'
+    container_name: dayguard-core
     depends_on:
       - postgres
       - rabbitmq
@@ -19,6 +18,15 @@ services:
       - prod
       - nginx-free
 
+  watchtower:
+    image: 'containrrr/watchtower:1.7.1'
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+    restart: 'always'
+    command: '--interval 30 dayguard-core'
+    profiles:
+      - prod
+
   nginx:
     image: 'rapidfort/nginx-official:1.25.5-alpine3.19-perl'
     volumes:
@@ -30,7 +38,7 @@ services:
     ports:
       - '443:443'
     depends_on:
-      - spring-backend
+      - dayguard-core
     profiles:
       - prod
 
