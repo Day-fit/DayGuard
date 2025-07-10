@@ -4,17 +4,17 @@ DayGuard is a secure and privacy-focused communication platform built with Sprin
 
 ## Features
 - End-to-end encrypted messaging (Coming soon !)
-- Limited message storing on database (to ensure private communication) (Coming soon !)
+- Limited attachments storing on database (to ensure private communication) (Coming soon !)
 - Real-time communication via WebSockets
-- Secure user authentication and session management (Coming soon !)
+- Secure user authentication and session management
 - Scalable backend using Spring Boot
 
 ## Technologies Used
 - **Spring Boot** – Core framework for the backend
 - **Spring WebSockets** – Enables real-time communication
-- **Spring Security** – Handles authentication and authorization (Coming soon !)
+- **Spring Security** – Handles authentication and authorization
 - **Spring Data JPA** – Simplifies database interactions
-- **PostgreSQL** – Database support (Coming soon !)
+- **PostgreSQL** – Database support
 - **Nginx** - Used for enabling HTTPS by using reverse proxy to the Spring-boot server
 - **RabbitMQ** - Used for handling queues of the messages
 - **Docker** – Containerized deployment
@@ -26,13 +26,13 @@ Look at [Prerequisites](#prerequisites) <br/>
 **Compose containers from `compose.yaml`**
 
 ```bash
-    docker compose up -d
+    docker compose --profile prod up -d
 ```
 
 ### Prerequisites
 - Java 21+
 - Maven 3+
-- Docker, Docker Compose (For linux users)
+- Docker with Docker Compose
 
 ### Steps to Run
 *(Coming Soon!)*
