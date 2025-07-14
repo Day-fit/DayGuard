@@ -3,7 +3,7 @@
 DayGuard is a secure and privacy-focused communication platform built with Spring Boot and its extensions. It leverages modern web technologies to provide a real-time, encrypted messaging experience.
 
 ## Features
-- End-to-end encrypted messaging (Coming soon !)
+- End-to-end **(with X3DH-like algorithm)** encrypted messaging (Coming soon !)
 - Limited attachments storing on database (to ensure private communication) (Coming soon !)
 - Real-time communication via WebSockets
 - Secure user authentication and session management
