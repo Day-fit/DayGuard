@@ -39,4 +39,7 @@ ssl/**/*.pem
 pgdata/
 
 ### Enviroment ###
-.env
+env.yaml
+
+### values helm files ###
+helm/dependencies/values.yaml

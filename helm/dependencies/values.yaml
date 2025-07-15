@@ -1,0 +1,17 @@
+redis:
+  architecture: replication
+  replica:
+    replicaCount: 1
+  auth:
+    enabled: true
+
+postgresql:
+  architecture: replication
+  readReplicas:
+    replicaCount: 1
+  replication:
+    synchronousCommit: on
+    numSynchronousReplicas: 1
+
+rabbitmq:
+  replicaCount: 1

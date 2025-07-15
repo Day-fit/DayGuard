@@ -1,0 +1,33 @@
+environments:
+  default:
+    values:
+      - ./env.yaml
+
+---
+
+releases:
+  - name: dependencies
+    chart: ./helm/dependencies
+    values:
+      - ./helm/dependencies/values.yaml
+    set:
+      - name: redis.auth.password
+        value: "{{ .Environment.Values.REDIS_PASSWORD}}"
+
+      - name: postgresql.auth.user
+        value: "{{ .Environment.Values.DB_USERNAME }}"
+
+      - name: postgresql.auth.password
+        value: "{{ .Environment.Values.DB_PASSWORD }}"
+
+      - name: postgresql.auth.postgresPassword
+        value: "{{ .Environment.Values.DB_SU_PASSWORD }}"
+
+      - name: postgresql.auth.replicationPassword
+        value: "{{ .Environment.Values.DB_REPLICATION_PASSWORD }}"
+
+      - name: rabbitmq.auth.username
+        value: "{{ .Environment.Values.RABBITMQ_USERNAME }}"
+
+      - name: rabbitmq.auth.password
+        value: "{{ .Environment.Values.RABBITMQ_PASSWORD }}"
