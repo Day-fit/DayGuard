@@ -1,0 +1,12 @@
+postgresql:
+  db:
+    name: "dayguard.db"
+  user: ""
+  password: ""
+
+rabbitmq:
+  user: "guest"
+  password: "guest"
+
+redis:
+  password: ""
