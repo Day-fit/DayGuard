@@ -1,0 +1,18 @@
+global:
+  image: "ghcr.io/day-fit/dayguard-core:latest"
+  useLocalImages: false
+
+postgresql:
+  auth:
+    database: "dayguard.db"
+    user: ""
+    password: ""
+
+rabbitmq:
+  auth:
+    username: "guest"
+    password: "guest"
+
+redis:
+  auth:
+    password: ""

@@ -1,0 +1,16 @@
+apiVersion: v2
+name: dependencies
+version: 0.1.0
+description: The dependencies of the dayguard application
+dependencies:
+  - name: redis
+    version: 21.2.10
+    repository: https://charts.bitnami.com/bitnami
+
+  - name: postgresql
+    version: 16.7.18
+    repository: https://charts.bitnami.com/bitnami
+
+  - name: rabbitmq
+    version: 16.0.10
+    repository: https://charts.bitnami.com/bitnami
