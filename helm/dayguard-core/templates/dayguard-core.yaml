@@ -14,25 +14,25 @@ spec:
     spec:
       containers:
         - name: dayguard-core
-          image: "ghcr.io/day-fit/dayguard-core:latest"
+          image: {{ if .Values.global.useLocalImages }}dayguard-core:local{{ else }}{{ .Values.global.image }}{{ end }}
           env:
             - name: POSTGRES_DB
-              value: "{{ .Values.postgresql.db.name }}"
+              value: "{{ .Values.postgresql.auth.database }}"
 
             - name: POSTGRES_USER
-              value: "{{ .Values.postgresql.user }}"
+              value: "{{ .Values.postgresql.auth.user }}"
 
             - name: POSTGRES_PASSWORD
-              value: "{{ .Values.postgresql.password }}"
+              value: "{{ .Values.postgresql.auth.password }}"
 
             - name: RABBIT_USER
-              value: "{{ .Values.rabbitmq.user }}"
+              value: "{{ .Values.rabbitmq.auth.username }}"
 
             - name: RABBIT_PASSWORD
-              value: "{{ .Values.rabbitmq.password }}"
+              value: "{{ .Values.rabbitmq.auth.password }}"
 
             - name: REDIS_PASSWORD
-              value: "{{ .Values.redis.password }}"
+              value: "{{ .Values.redis.auth.password }}"
 
 ---
 

@@ -40,6 +40,4 @@ pgdata/
 
 ### Enviroment ###
 env.yaml
-
-### values helm files ###
-helm/dependencies/values.yaml
+env.localProd.yaml

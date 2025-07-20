@@ -1,12 +1,18 @@
+global:
+  image: "ghcr.io/day-fit/dayguard-core:latest"
+  useLocalImages: false
+
 postgresql:
-  db:
-    name: "dayguard.db"
-  user: ""
-  password: ""
+  auth:
+    database: "dayguard.db"
+    user: ""
+    password: ""
 
 rabbitmq:
-  user: "guest"
-  password: "guest"
+  auth:
+    username: "guest"
+    password: "guest"
 
 redis:
-  password: ""
+  auth:
+    password: ""

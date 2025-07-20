@@ -10,7 +10,7 @@ postgresql:
   readReplicas:
     replicaCount: 1
   replication:
-    synchronousCommit: on
+    synchronousCommit: "on"
     numSynchronousReplicas: 1
 
 rabbitmq:

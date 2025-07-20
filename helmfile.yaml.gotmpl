@@ -3,6 +3,10 @@ environments:
     values:
       - ./env.yaml
 
+  dev:
+    values:
+      - ./env.localProd.yaml
+
 ---
 
 releases:
@@ -12,7 +16,7 @@ releases:
       - ./helm/dependencies/values.yaml
     set:
       - name: redis.auth.password
-        value: "{{ .Environment.Values.redis.password}}"
+        value: "{{ .Environment.Values.redis.password }}"
 
       - name: postgresql.auth.user
         value: "{{ .Environment.Values.postgresql.user }}"
@@ -27,7 +31,27 @@ releases:
         value: "{{ .Environment.Values.postgresql.replicationPassword }}"
 
       - name: rabbitmq.auth.username
-        value: "{{ .Environment.Values.rabbitmq.user }}"
+        value: "{{ .Environment.Values.rabbitmq.username }}"
+
+      - name: rabbitmq.auth.password
+        value: "{{ .Environment.Values.rabbitmq.password }}"
+
+  - name: dayguard-core
+    chart: ./helm/dayguard-core
+    values:
+      - ./helm/dayguard-core/values.yaml
+    set:
+      - name: redis.auth.password
+        value: "{{ .Environment.Values.redis.password}}"
+
+      - name: postgresql.auth.user
+        value: "{{ .Environment.Values.postgresql.user }}"
+
+      - name: postgresql.auth.password
+        value: "{{ .Environment.Values.postgresql.password }}"
+
+      - name: rabbitmq.auth.username
+        value: "{{ .Environment.Values.rabbitmq.username }}"
 
       - name: rabbitmq.auth.password
         value: "{{ .Environment.Values.rabbitmq.password }}"
