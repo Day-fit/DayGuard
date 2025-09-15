@@ -10,6 +10,7 @@ import pl.dayfit.dayguard.dto.encryption.UploadSpkKeyDTO;
 import pl.dayfit.dayguard.entity.OpkPublicKey;
 import pl.dayfit.dayguard.entity.User;
 import pl.dayfit.dayguard.exception.InvalidSignatureException;
+import pl.dayfit.dayguard.repository.OpkPublicKeyRepository;
 import pl.dayfit.dayguard.service.cache.UserCacheService;
 import pl.dayfit.dayguard.type.OpkStatus;
 
@@ -21,12 +22,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class EncryptionKeyService {
     private final UserCacheService userCacheService;
+    private final OpkPublicKeyRepository opkPublicKeyRepository;
 
     public PreKeyBundleResponseDTO getPreKeyBundle(UUID id) {
         Base64.Encoder encoder = Base64.getEncoder();
 
         User user = userCacheService.findById(id);
-        List<OpkPublicKey> opkPubs = user.getOpkPubs();
+        List<OpkPublicKey> opkPubs = opkPublicKeyRepository.findByUploaderIdAndStatus(id, OpkStatus.ACTIVE);
         OpkPublicKey opkPub = opkPubs.isEmpty() ? null : opkPubs.getFirst();
 
         if (opkPub == null)
@@ -42,8 +44,7 @@ public class EncryptionKeyService {
         opkPub.setStatus(OpkStatus.CONSUMED);
         opkPubs.set(0, opkPub);
 
-        user.setOpkPubs(opkPubs);
-        userCacheService.save(user);
+        opkPublicKeyRepository.save(opkPub);
 
         return new PreKeyBundleResponseDTO(
                 encoder.encodeToString(user.getIkPub()),

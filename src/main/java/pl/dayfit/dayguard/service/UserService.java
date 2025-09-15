@@ -32,7 +32,6 @@ public class UserService {
         String username = dto.getUsername();
         String email = dto.getEmail();
 
-
         byte[] ikPublicKey = Base64.getDecoder().decode(dto.getIkPub());
         byte[] spkPublicKey = Base64.getDecoder().decode(dto.getSpkPub());
         byte[] spkSignature = Base64.getDecoder().decode(dto.getSpkSignature());
@@ -63,13 +62,15 @@ public class UserService {
 
         User savedUser = userCacheService.save(user); //Saving to get ID
 
-        savedUser.setOpkPubs(
-                opkPublicKeys
-                        .stream()
-                        .map(opk -> new OpkPublicKey(null, opk, OpkStatus.ACTIVE, savedUser.getId()))
-                        .toList()
+        savedUser.getOpkPubs()
+            .addAll(
+                    opkPublicKeys
+                            .stream()
+                            .map(opk -> new OpkPublicKey(null, opk, OpkStatus.ACTIVE, savedUser.getId()))
+                            .toList()
         );
 
+        userCacheService.save(savedUser);
     }
 
     public UserDetailsResponseDTO getUserDetailsDTO(String identifier)

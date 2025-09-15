@@ -72,11 +72,11 @@ class ConnectionManager {
                     const msg = JSON.parse(message.body);
                     if (!msg.fromMe) {
                         // Try to decrypt the message if it contains encrypted data
-                        if (msg.message && msg.ephemeralPub) {
+                        if (msg.ephemeralPub) {
                             try {
                                 const senderUuid = this.userListManager.getUserUuid(msg.sender);
                                 if (senderUuid) {
-                                    msg.message = this.encryptionManager.decryptMessage(
+                                    msg.message = await this.encryptionManager.decryptMessage(
                                         senderUuid,
                                         msg.message,
                                         msg.ephemeralPub
