@@ -2,6 +2,9 @@ package pl.dayfit.dayguard.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,7 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 import pl.dayfit.dayguard.dto.auth.LoginDTO;
 import pl.dayfit.dayguard.dto.auth.RegisterDTO;
+import pl.dayfit.dayguard.helpers.CryptographyHelper;
+import pl.dayfit.dayguard.repository.UserRepository;
 
+import java.util.Base64;
 import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -34,22 +40,42 @@ class AuthenticationControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private CryptographyHelper cryptographyHelper;
+
     private MockMvc mockMvc;
+
+    private RegisterDTO registerDTO;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @BeforeEach
     void setUp() {
+        userRepository.deleteAll();
         mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+
+        AsymmetricCipherKeyPair keyPair = cryptographyHelper.generateEd25519();
+
+        byte[] ikPrivate = ((Ed25519PrivateKeyParameters) keyPair.getPrivate()).getEncoded();
+        byte[] ikPublic = ((Ed25519PublicKeyParameters) keyPair.getPublic()).getEncoded();
+
+        byte[] spkPublic = ((Ed25519PublicKeyParameters) cryptographyHelper.generateEd25519().getPublic()).getEncoded();
+        byte[] spkSignature = cryptographyHelper.generateSignature(ikPrivate, spkPublic);
+
+        registerDTO = RegisterDTO.builder()
+                .username("detailsuser")
+                .email("details@example.com")
+                .password("password123")
+                .spkPub(Base64.getEncoder().encodeToString(spkPublic))
+                .spkSignature(Base64.getEncoder().encodeToString(spkSignature))
+                .ikPub(Base64.getEncoder().encodeToString(ikPublic))
+                .opkPubs(List.of(cryptographyHelper.generateEd25519Base64(false)))
+                .build();
     }
 
     @Test
     void testRegisterSuccess() throws Exception {
-        // Given
-        RegisterDTO registerDTO = RegisterDTO.builder()
-                .username("newuser")
-                .email("newuser@example.com")
-                .password("password123")
-                .build();
-
         // When & Then
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -61,22 +87,13 @@ class AuthenticationControllerTest {
     @Test
     void testRegisterWithDuplicateUsername() throws Exception {
         // Given
-        RegisterDTO firstUser = RegisterDTO.builder()
-                .username("duplicateuser")
-                .email("first@example.com")
-                .password("password123")
-                .build();
-
-        RegisterDTO secondUser = RegisterDTO.builder()
-                .username("duplicateuser")
-                .email("second@example.com")
-                .password("password456")
-                .build();
+        RegisterDTO secondUser = registerDTO;
+        secondUser.setUsername("detailsuser");
 
         // When & Then
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(firstUser)))
+                        .content(objectMapper.writeValueAsString(registerDTO)))
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/v1/auth/register")
@@ -89,22 +106,13 @@ class AuthenticationControllerTest {
     @Test
     void testRegisterWithDuplicateEmail() throws Exception {
         // Given
-        RegisterDTO firstUser = RegisterDTO.builder()
-                .username("firstuser")
-                .email("duplicate@example.com")
-                .password("password123")
-                .build();
-
-        RegisterDTO secondUser = RegisterDTO.builder()
-                .username("seconduser")
-                .email("duplicate@example.com")
-                .password("password456")
-                .build();
+        RegisterDTO secondUser = registerDTO;
+        secondUser.setEmail("details@example.com");
 
         // When & Then
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(firstUser)))
+                        .content(objectMapper.writeValueAsString(registerDTO)))
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/v1/auth/register")
@@ -117,11 +125,10 @@ class AuthenticationControllerTest {
     @Test
     void testRegisterWithInvalidData() throws Exception {
         // Given
-        RegisterDTO invalidUser = RegisterDTO.builder()
-                .username("") // Invalid: empty username
-                .email("invalid-email") // Invalid: malformed email
-                .password("123") // Invalid: too short password
-                .build();
+        RegisterDTO invalidUser = registerDTO;
+        invalidUser.setUsername(""); // Invalid: empty username
+        invalidUser.setEmail("invalid-email"); // Invalid: malformed email
+        invalidUser.setPassword("123"); // Invalid: too short password
 
         // When & Then
         mockMvc.perform(post("/api/v1/auth/register")
@@ -132,13 +139,6 @@ class AuthenticationControllerTest {
 
     @Test
     void testLoginSuccess() throws Exception {
-        // Given
-        RegisterDTO registerDTO = RegisterDTO.builder()
-                .username("loginuser")
-                .email("loginuser@example.com")
-                .password("password123")
-                .build();
-
         // Register user first
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -147,7 +147,7 @@ class AuthenticationControllerTest {
 
         // Then login
         LoginDTO loginDTO = LoginDTO.builder()
-                .identifier("loginuser")
+                .identifier("detailsuser")
                 .password("password123")
                 .build();
 
@@ -176,13 +176,6 @@ class AuthenticationControllerTest {
 
     @Test
     void testLoginWithEmail() throws Exception {
-        // Given
-        RegisterDTO registerDTO = RegisterDTO.builder()
-                .username("emailuser")
-                .email("emailuser@example.com")
-                .password("password123")
-                .build();
-
         // Register user first
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -191,7 +184,7 @@ class AuthenticationControllerTest {
 
         // Then login with email
         LoginDTO loginDTO = LoginDTO.builder()
-                .identifier("emailuser@example.com")
+                .identifier("details@example.com")
                 .password("password123")
                 .build();
 
@@ -214,20 +207,13 @@ class AuthenticationControllerTest {
 
     @Test
     void testRefreshToken() throws Exception {
-        // Given - First register and login to get tokens
-        RegisterDTO registerDTO = RegisterDTO.builder()
-                .username("refreshuser")
-                .email("refreshuser@example.com")
-                .password("password123")
-                .build();
-
-        mockMvc.perform(post("/api/v1/auth/register")
+          mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerDTO)))
                 .andExpect(status().isOk());
 
         LoginDTO loginDTO = LoginDTO.builder()
-                .identifier("refreshuser")
+                .identifier("detailsuser")
                 .password("password123")
                 .build();
 

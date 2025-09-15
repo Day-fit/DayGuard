@@ -1,6 +1,9 @@
-package pl.dayfit.dayguard.Integration;
+package pl.dayfit.dayguard.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,12 +14,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import pl.dayfit.dayguard.dto.auth.LoginDTO;
 import pl.dayfit.dayguard.dto.auth.RegisterDTO;
+import pl.dayfit.dayguard.helpers.CryptographyHelper;
+import pl.dayfit.dayguard.repository.UserRepository;
 
 
+import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -25,7 +30,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@Transactional
 class WebSocketIntegrationTest {
 
     @LocalServerPort
@@ -36,23 +40,42 @@ class WebSocketIntegrationTest {
 
     private RestTemplate restTemplate;
     private String baseUrl;
+    private RegisterDTO registerDTO;
+
+    @Autowired
+    private CryptographyHelper cryptographyHelper;
+    @Autowired
+    private UserRepository userRepository;
 
     @BeforeEach
     void setUp() {
+        userRepository.deleteAll();
+
         restTemplate = new RestTemplate();
         restTemplate.setErrorHandler(response -> response.getStatusCode().is5xxServerError());
         baseUrl = "http://localhost:" + port;
+
+        AsymmetricCipherKeyPair keyPair = cryptographyHelper.generateEd25519();
+
+        byte[] ikPrivate = ((Ed25519PrivateKeyParameters) keyPair.getPrivate()).getEncoded();
+        byte[] ikPublic = ((Ed25519PublicKeyParameters) keyPair.getPublic()).getEncoded();
+
+        byte[] spkPublic = ((Ed25519PublicKeyParameters) cryptographyHelper.generateEd25519().getPublic()).getEncoded();
+        byte[] spkSignature = cryptographyHelper.generateSignature(ikPrivate, spkPublic);
+
+        registerDTO = RegisterDTO.builder()
+                .username("detailsuser")
+                .email("details@example.com")
+                .password("password123")
+                .spkPub(Base64.getEncoder().encodeToString(spkPublic))
+                .spkSignature(Base64.getEncoder().encodeToString(spkSignature))
+                .ikPub(Base64.getEncoder().encodeToString(ikPublic))
+                .opkPubs(List.of(cryptographyHelper.generateEd25519Base64(false)))
+                .build();
     }
 
     @Test
     void testUserRegistrationAndLogin() {
-        // Given
-        RegisterDTO registerDTO = RegisterDTO.builder()
-                .username("integrationuser")
-                .email("integration@example.com")
-                .password("password123")
-                .build();
-
         // When - Register user
         ResponseEntity<String> registerResponse = restTemplate.postForEntity(
                 baseUrl + "/api/v1/auth/register",
@@ -65,7 +88,7 @@ class WebSocketIntegrationTest {
 
         // When - Login user
         LoginDTO loginDTO = LoginDTO.builder()
-                .identifier("integrationuser")
+                .identifier("detailsuser")
                 .password("password123")
                 .build();
 
@@ -82,13 +105,6 @@ class WebSocketIntegrationTest {
 
     @Test
     void testGetUserDetails() {
-        // Given - Register and login first
-        RegisterDTO registerDTO = RegisterDTO.builder()
-                .username("detailsuser")
-                .email("details@example.com")
-                .password("password123")
-                .build();
-
         restTemplate.postForEntity(
                 baseUrl + "/api/v1/auth/register",
                 createHttpEntity(registerDTO),
@@ -133,13 +149,6 @@ class WebSocketIntegrationTest {
 
     @Test
     void testTokenRefresh() {
-        // Given - Register and login first
-        RegisterDTO registerDTO = RegisterDTO.builder()
-                .username("refreshuser")
-                .email("refresh@example.com")
-                .password("password123")
-                .build();
-
         restTemplate.postForEntity(
                 baseUrl + "/api/v1/auth/register",
                 createHttpEntity(registerDTO),
@@ -147,7 +156,7 @@ class WebSocketIntegrationTest {
         );
 
         LoginDTO loginDTO = LoginDTO.builder()
-                .identifier("refreshuser")
+                .identifier("detailsuser")
                 .password("password123")
                 .build();
 
@@ -213,13 +222,6 @@ class WebSocketIntegrationTest {
 
     @Test
     void testDuplicateRegistration() {
-        // Given
-        RegisterDTO registerDTO = RegisterDTO.builder()
-                .username("duplicateuser")
-                .email("duplicate@example.com")
-                .password("password123")
-                .build();
-
         // When - Register first time
         ResponseEntity<String> firstResponse = restTemplate.postForEntity(
                 baseUrl + "/api/v1/auth/register",

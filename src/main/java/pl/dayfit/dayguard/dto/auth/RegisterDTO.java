@@ -25,10 +25,13 @@ public class RegisterDTO {
     @Size(max = 64, min = 8, message = "Password must be in range of 8-64 characters")
     private String password;
 
+    @NotBlank(message = "ikPub cannot be null")
     private String ikPub;
+    @NotBlank(message = "spkPub cannot be null")
     private String spkPub;
-
+    @NotBlank(message = "spkSignature cannot be null")
     private String spkSignature;
 
+    @NotEmpty(message = "opkPubs keys cannot be null")
     List<String> opkPubs;
 }

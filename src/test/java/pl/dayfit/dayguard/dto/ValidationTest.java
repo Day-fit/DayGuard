@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import pl.dayfit.dayguard.dto.auth.LoginDTO;
 import pl.dayfit.dayguard.dto.auth.RegisterDTO;
+import pl.dayfit.dayguard.helpers.CryptographyHelper;
 import pl.dayfit.dayguard.message.AttachmentMessage;
 
 import java.util.List;
@@ -15,9 +16,14 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class ValidationTest {
-
+public class ValidationTest {
     private static Validator validator;
+    private final CryptographyHelper helper;
+
+    public ValidationTest()
+    {
+        helper = new CryptographyHelper();
+    }
 
     @BeforeAll
     static void setUp() {
@@ -33,6 +39,10 @@ class ValidationTest {
                 .username("validuser")
                 .email("valid@example.com")
                 .password("validpassword123")
+                .opkPubs(List.of(helper.generateEd25519Base64(false)))
+                .ikPub(helper.generateEd25519Base64(false))
+                .spkPub(helper.generateEd25519Base64(false))
+                .spkSignature(helper.generateEd25519Base64(false)) //Not a spk signature, but it's not checked by annotation
                 .build();
 
         // When
@@ -197,8 +207,7 @@ class ValidationTest {
         // Then
         assertFalse(violations.isEmpty());
         assertTrue(violations.stream()
-                .anyMatch(v -> v.getPropertyPath().toString().equals("message") &&
-                        v.getMessage().equals("Message cannot be blank")));
+                .anyMatch(v -> v.getMessageTemplate().equals("Message cannot be blank")));
     }
 
     @Test
@@ -220,10 +229,9 @@ class ValidationTest {
     @Test
     void testAttachmentMessageRequestDTOInvalidReceiver() {
         // Given
-        AttachmentMessage.Attachment attachment = new AttachmentMessage.Attachment("test.txt", "base64data", "text/plain", 1024L);
         AttachmentMessageRequestDTO attachmentMessageDTO = AttachmentMessageRequestDTO.builder()
                 .receiver("") // Invalid: blank receiver
-                .attachments(List.of(attachment))
+                .attachments(List.of(new AttachmentMessage.Attachment("test.txt", "base64data", "text/plain", 1024L)))
                 .build();
 
         // When

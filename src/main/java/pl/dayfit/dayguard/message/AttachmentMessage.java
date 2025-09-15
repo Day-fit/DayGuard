@@ -1,7 +1,6 @@
 package pl.dayfit.dayguard.message;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.*;
 import pl.dayfit.dayguard.dto.AttachmentMessageResponseDTO;
 import lombok.experimental.SuperBuilder;
 
@@ -29,8 +28,10 @@ public class AttachmentMessage extends CommunicationAbstractMessage{
         );
     }
 
-    @Data
+    @Getter
+    @Setter
     @AllArgsConstructor
+    @NoArgsConstructor
     public static class Attachment {
         private String name;
         private String data;

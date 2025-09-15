@@ -1,25 +1,32 @@
 package pl.dayfit.dayguard.service;
 
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
+import pl.dayfit.dayguard.entity.OpkPublicKey;
 import pl.dayfit.dayguard.entity.User;
+import pl.dayfit.dayguard.helpers.CryptographyHelper;
 import pl.dayfit.dayguard.repository.UserRepository;
 import pl.dayfit.dayguard.service.cache.UserCacheService;
+import pl.dayfit.dayguard.type.OpkStatus;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.NoSuchElementException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Transactional
 class UserServiceTest {
+    @Autowired
+    private CryptographyHelper helper;
 
     @Autowired
     private UserCacheService cacheService;
@@ -31,23 +38,39 @@ class UserServiceTest {
 
     @BeforeEach
     void setUp() {
+        userRepository.deleteAll();
+
+        AsymmetricCipherKeyPair ikCipherPair = helper.generateEd25519();
+        AsymmetricCipherKeyPair spkCipherPair = helper.generateEd25519();
+
+        byte[] ikPub = ((Ed25519PublicKeyParameters) ikCipherPair.getPublic()).getEncoded();
+        byte[] ikPrivate = ((Ed25519PrivateKeyParameters) ikCipherPair.getPrivate()).getEncoded();
+
+        byte[] spkPub = ((Ed25519PublicKeyParameters) spkCipherPair.getPublic()).getEncoded();
+
         testUser = new User();
         testUser.setUsername("testuser");
         testUser.setEmail("test@example.com");
         testUser.setPassword("hashedPassword123");
+        testUser.setSpkPub(spkPub);
+        testUser.setIkPub(ikPub);
+        testUser.setSpkPub(spkPub);
+        testUser.setSpkSignature(helper.generateSignature(ikPrivate, spkPub));
+
         testUser.setRoles(Collections.singletonList(new SimpleGrantedAuthority("user")));
+
+        testUser = cacheService.save(testUser);
+
+        testUser.setOpkPubs(List.of(new OpkPublicKey(null, spkPub, OpkStatus.ACTIVE, testUser.getId())));
+        cacheService.save(testUser);
     }
 
     @Test
     void testCreateUser() {
-        // When
-        User createdUser = cacheService.save(testUser);
-
-        // Then
-        assertNotNull(createdUser);
-        assertNotNull(createdUser.getId());
-        assertEquals("testuser", createdUser.getUsername());
-        assertEquals("test@example.com", createdUser.getEmail());
+        assertNotNull(testUser);
+        assertNotNull(testUser);
+        assertEquals("testuser", testUser.getUsername());
+        assertEquals("test@example.com", testUser.getEmail());
     }
 
     @Test

@@ -1,7 +1,6 @@
 package pl.dayfit.dayguard.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,7 +16,9 @@ import java.util.UUID;
 @NoArgsConstructor
 public class OpkPublicKey {
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @Column(name = "opk_key")
     private byte[] key;
     private OpkStatus status;
     private UUID uploaderId;
