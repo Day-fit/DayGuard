@@ -1,6 +1,7 @@
 import ConnectionManager from './Classes/ConnectionManager.js';
 import MessageManager from './Classes/MessageManager.js';
 import UserListManager from './Classes/UserListManager.js';
+import EncryptionManager from './Classes/EncryptionManager.js';
 import DOMPurify from 'dompurify';
 import validator from 'validator';
 import zxcvbn from 'zxcvbn';
@@ -8,7 +9,8 @@ import zxcvbn from 'zxcvbn';
 // Initialize managers
 const messageManager = new MessageManager();
 const userListManager = new UserListManager();
-const connectionManager = new ConnectionManager(messageManager, userListManager);
+const encryptionManager = new EncryptionManager();
+const connectionManager = new ConnectionManager(messageManager, userListManager, encryptionManager);
 
 // Set up manager connections
 userListManager.setMessageDisplay(messageManager);
@@ -52,6 +54,9 @@ let typingTimeout = null;
     showLoading();
     
     try {
+        // Initialize encryption manager
+        await encryptionManager.initialize();
+        
         // First try to refresh the token
         const tokenRefreshed = await tryRefreshToken();
         
@@ -175,10 +180,21 @@ registerForm.addEventListener('submit', async (e) => {
     }
 
     try {
+        // Generate encryption keys
+        const encryptionKeys = encryptionManager.generateKeysForRegistration();
+        
         const res = await fetch('/api/v1/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: regUsername, email: regEmail, password: regPassword }),
+            body: JSON.stringify({ 
+                username: regUsername, 
+                email: regEmail, 
+                password: regPassword,
+                ikPub: encryptionKeys.ikPub,
+                spkPub: encryptionKeys.spkPub,
+                spkSignature: encryptionKeys.spkSignature,
+                opkPubs: encryptionKeys.opkPubs
+            }),
         });
         
         if (res.ok) {
@@ -188,7 +204,8 @@ registerForm.addEventListener('submit', async (e) => {
             showError(registerError, data.message || 'Registration failed');
         }
     } catch (error) {
-        showError(registerError, 'Connection error. Please try again.');
+        console.error('Registration error:', error);
+        showError(registerError, 'Registration failed. Please try again.');
     }
 });
 
@@ -279,6 +296,10 @@ async function loginUser(identifier, password) {
                 const userData = await userRes.json();
                 username = userData.username;
                 email = userData.email;
+                
+                // Check if we need to upload keys (for existing users without keys)
+                await uploadKeysIfNeeded();
+                
                 showChat();
             } else {
                 // Fallback to identifier if user details fail
@@ -290,7 +311,26 @@ async function loginUser(identifier, password) {
             showError(loginError, data.message || 'Invalid credentials');
         }
     } catch (error) {
+        console.error('Login error:', error);
         showError(loginError, 'Connection error. Please try again.');
+    }
+}
+
+async function uploadKeysIfNeeded() {
+    try {
+        // Generate keys if not already generated
+        if (!encryptionManager.identityKeyPair) {
+            const encryptionKeys = encryptionManager.generateKeysForRegistration();
+            
+            // Upload SPK
+            await encryptionManager.uploadSpk(encryptionKeys.spkPub, encryptionKeys.spkSignature);
+            
+            // Upload OPK keys
+            await encryptionManager.uploadOpkKeys(encryptionKeys.opkPubs);
+        }
+    } catch (error) {
+        console.error('Error uploading keys:', error);
+        // Don't block login if key upload fails
     }
 }
 
@@ -368,9 +408,9 @@ messageInput.addEventListener('input', () => {
     messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
 });
 
-function sendMessage() {
+async function sendMessage() {
     const message = DOMPurify.sanitize(messageInput.value.trim());
-    if (connectionManager.sendMessage(message)) {
+    if (await connectionManager.sendMessage(message)) {
         messageInput.value = '';
         messageInput.style.height = 'auto';
         closeMobileSidebar(); // Close sidebar on mobile after sending

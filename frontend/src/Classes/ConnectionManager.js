@@ -1,11 +1,12 @@
-import { Client } from '@stomp/stompjs';
+import {Client} from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import DOMPurify from 'dompurify';
 
 class ConnectionManager {
-    constructor(messageManager, userListManager) {
+    constructor(messageManager, userListManager, encryptionManager) {
         this.messageManager = messageManager;
         this.userListManager = userListManager;
+        this.encryptionManager = encryptionManager;
         this.stompClient = null;
         this.attachments = [];
         this.username = '';
@@ -66,10 +67,30 @@ class ConnectionManager {
         // Subscribe to personal messages
         this.stompClient.subscribe(
             `/user/${this.username}/queue/messages`,
-            (message) => {
+            async (message) => {
                 try {
                     const msg = JSON.parse(message.body);
                     if (!msg.fromMe) {
+                        // Try to decrypt the message if it contains encrypted data
+                        if (msg.message && msg.ephemeralPub) {
+                            try {
+                                const senderUuid = this.userListManager.getUserUuid(msg.sender);
+                                if (senderUuid) {
+                                    msg.message = this.encryptionManager.decryptMessage(
+                                        senderUuid,
+                                        msg.message,
+                                        msg.ephemeralPub
+                                    );
+                                } else {
+                                    console.warn('Cannot decrypt message: sender UUID not available');
+                                    msg.message = '[Encrypted message - decryption failed]';
+                                }
+                            } catch (decryptError) {
+                                console.error('Error decrypting message:', decryptError);
+                                msg.message = '[Encrypted message - decryption failed]';
+                            }
+                        }
+
                         this.messageManager.storeMessage(msg);
                         
                         if (msg.sender === this.userListManager.getSelectedReceiver()) {
@@ -206,7 +227,7 @@ class ConnectionManager {
         }
     }
 
-    sendMessage(message) {
+    async sendMessage(message) {
         const selectedReceiver = this.userListManager.getSelectedReceiver();
 
         if ((!message && this.attachments.length === 0) || !selectedReceiver) {
@@ -226,21 +247,33 @@ class ConnectionManager {
 
         // Send text message first if it exists
         if (message && message.trim()) {
-            const textMessage = {
-                receiver: selectedReceiver,
-                message: message.trim()
-            };
-
-            console.log('Sending text message:', textMessage);
-
             try {
+                // Get receiver UUID for encryption
+                const receiverUuid = this.userListManager.getSelectedReceiverUuid();
+                if (!receiverUuid) {
+                    this.showNotification('Cannot send message: User UUID not available', 'error');
+                    return false;
+                }
+
+                // Encrypt the message (guard against missing bundle fields)
+                const encryptedData = await this.encryptionManager.encryptMessage(receiverUuid, message.trim());
+                
+                const textMessage = {
+                    receiver: selectedReceiver,
+                    ciphertext: encryptedData.ciphertext,
+                    ephemeralPub: encryptedData.ephemeralPub,
+                    message: encryptedData.ciphertext // Include for deserializer compatibility
+                };
+
+                console.log('Sending encrypted text message:', textMessage);
+
                 this.stompClient.publish({
                     destination: "/app/publish/text",
                     body: JSON.stringify(textMessage),
                     headers: { 'content-type': 'application/json' }
                 });
 
-                // Create a local message for display
+                // Create a local message for display (show plain text locally)
                 const outgoingTextMessage = {
                     sender: this.username,
                     receiver: selectedReceiver,
@@ -253,8 +286,8 @@ class ConnectionManager {
                 this.messageManager.displayMessage(outgoingTextMessage);
                 messagesSent++;
             } catch (error) {
-                console.error('Error sending text message:', error);
-                this.showNotification('Failed to send text message', 'error');
+                console.error('Error sending encrypted text message:', error);
+                this.showNotification('Failed to send encrypted message', 'error');
                 return false;
             }
         }

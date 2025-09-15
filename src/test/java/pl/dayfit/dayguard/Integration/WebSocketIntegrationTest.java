@@ -13,8 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
-import pl.dayfit.dayguard.DTOs.Auth.LoginDTO;
-import pl.dayfit.dayguard.DTOs.Auth.RegisterDTO;
+import pl.dayfit.dayguard.dto.auth.LoginDTO;
+import pl.dayfit.dayguard.dto.auth.RegisterDTO;
 
 
 import java.util.List;
