@@ -87,7 +87,24 @@ class AuthenticationControllerTest {
     @Test
     void testRegisterWithDuplicateUsername() throws Exception {
         // Given
-        RegisterDTO secondUser = registerDTO;
+        AsymmetricCipherKeyPair keyPair = cryptographyHelper.generateEd25519();
+
+        byte[] ikPrivate = ((Ed25519PrivateKeyParameters) keyPair.getPrivate()).getEncoded();
+        byte[] ikPublic = ((Ed25519PublicKeyParameters) keyPair.getPublic()).getEncoded();
+
+        byte[] spkPublic = ((Ed25519PublicKeyParameters) cryptographyHelper.generateEd25519().getPublic()).getEncoded();
+        byte[] spkSignature = cryptographyHelper.generateSignature(ikPrivate, spkPublic);
+
+        RegisterDTO secondUser = RegisterDTO.builder()
+                .username("detailsuser")
+                .email("details@example.com")
+                .password("password123")
+                .spkPub(Base64.getEncoder().encodeToString(spkPublic))
+                .spkSignature(Base64.getEncoder().encodeToString(spkSignature))
+                .ikPub(Base64.getEncoder().encodeToString(ikPublic))
+                .opkPubs(List.of(cryptographyHelper.generateEd25519Base64(false)))
+                .build();
+
         secondUser.setUsername("detailsuser");
 
         // When & Then
@@ -106,7 +123,24 @@ class AuthenticationControllerTest {
     @Test
     void testRegisterWithDuplicateEmail() throws Exception {
         // Given
-        RegisterDTO secondUser = registerDTO;
+        AsymmetricCipherKeyPair keyPair = cryptographyHelper.generateEd25519();
+
+        byte[] ikPrivate = ((Ed25519PrivateKeyParameters) keyPair.getPrivate()).getEncoded();
+        byte[] ikPublic = ((Ed25519PublicKeyParameters) keyPair.getPublic()).getEncoded();
+
+        byte[] spkPublic = ((Ed25519PublicKeyParameters) cryptographyHelper.generateEd25519().getPublic()).getEncoded();
+        byte[] spkSignature = cryptographyHelper.generateSignature(ikPrivate, spkPublic);
+
+        RegisterDTO secondUser = RegisterDTO.builder()
+                .username("detailsuser")
+                .email("details@example.com")
+                .password("password123")
+                .spkPub(Base64.getEncoder().encodeToString(spkPublic))
+                .spkSignature(Base64.getEncoder().encodeToString(spkSignature))
+                .ikPub(Base64.getEncoder().encodeToString(ikPublic))
+                .opkPubs(List.of(cryptographyHelper.generateEd25519Base64(false)))
+                .build();
+
         secondUser.setEmail("details@example.com");
 
         // When & Then
@@ -125,10 +159,23 @@ class AuthenticationControllerTest {
     @Test
     void testRegisterWithInvalidData() throws Exception {
         // Given
-        RegisterDTO invalidUser = registerDTO;
-        invalidUser.setUsername(""); // Invalid: empty username
-        invalidUser.setEmail("invalid-email"); // Invalid: malformed email
-        invalidUser.setPassword("123"); // Invalid: too short password
+        AsymmetricCipherKeyPair keyPair = cryptographyHelper.generateEd25519();
+
+        byte[] ikPrivate = ((Ed25519PrivateKeyParameters) keyPair.getPrivate()).getEncoded();
+        byte[] ikPublic = ((Ed25519PublicKeyParameters) keyPair.getPublic()).getEncoded();
+
+        byte[] spkPublic = ((Ed25519PublicKeyParameters) cryptographyHelper.generateEd25519().getPublic()).getEncoded();
+        byte[] spkSignature = cryptographyHelper.generateSignature(ikPrivate, spkPublic);
+
+        RegisterDTO invalidUser = RegisterDTO.builder()
+                .username("")
+                .email("invalid-email")
+                .password("123")
+                .spkPub(Base64.getEncoder().encodeToString(spkPublic))
+                .spkSignature(Base64.getEncoder().encodeToString(spkSignature))
+                .ikPub(Base64.getEncoder().encodeToString(ikPublic))
+                .opkPubs(List.of(cryptographyHelper.generateEd25519Base64(false)))
+                .build();
 
         // When & Then
         mockMvc.perform(post("/api/v1/auth/register")
