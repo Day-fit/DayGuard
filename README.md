@@ -3,7 +3,7 @@
 DayGuard is a secure and privacy-focused communication platform built with Spring Boot and its extensions. It leverages modern web technologies to provide a real-time, encrypted messaging experience.
 
 ## Features
-- End-to-end encrypted messaging (Coming soon !)
+- End-to-end (X3DH) encrypted messaging 
 - Limited attachments storing on database (to ensure private communication) (Coming soon !)
 - Real-time communication via WebSockets
 - Secure user authentication and session management
@@ -21,7 +21,8 @@ DayGuard is a secure and privacy-focused communication platform built with Sprin
 
 ## Installation
 Look at [Prerequisites](#prerequisites) <br/>
-*(Coming Soon!)*
+
+**Set up .env file (look at .env.example)**
 
 **Compose containers from `compose.yaml`**
 
@@ -30,22 +31,13 @@ Look at [Prerequisites](#prerequisites) <br/>
 ```
 
 ### Prerequisites
-- Java 21+
-- Maven 3+
 - Docker with Docker Compose
-
-### Steps to Run
-*(Coming Soon!)*
-
-## Configuration
-*(Coming Soon!)*
 
 ## Disclaimer
 DayGuard is provided "as is" without any warranties. The author assumes no responsibility for any issues, damages, or data loss resulting from the use of this software.
 
 ## Coming features
-- Implement account functionality
-- E2E encrypting
+- Implementing Dual-Ratchet for stronger E2EE
 - Support for group messaging
 - Advanced encryption options
 - Implement mobile and web clients
