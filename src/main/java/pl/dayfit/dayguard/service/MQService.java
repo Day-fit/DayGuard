@@ -4,6 +4,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.web.socket.messaging.SessionConnectEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
+import pl.dayfit.dayguard.dto.ActiveUserDTO;
 import pl.dayfit.dayguard.entity.User;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Component;
 import pl.dayfit.dayguard.event.UserMQCreationEndedEvent;
 import pl.dayfit.dayguard.service.cache.UserCacheService;
 
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -114,5 +116,13 @@ public class MQService {
         rabbitAdmin.deleteQueue(MESSAGING_PM_PREFIX + user.getUsername());
         rabbitAdmin.deleteExchange(MESSAGING_PM_PREFIX + user.getUsername());
         rabbitAdmin.deleteQueue(ACTIVITY_PREFIX + user.getUsername());
+    }
+
+    public List<ActiveUserDTO> getActiveUsersAsDTO()
+    {
+        return activeUsers.values()
+                .stream()
+                .map(user -> new ActiveUserDTO(user.getId(), user.getUsername()))
+                .toList();
     }
 }

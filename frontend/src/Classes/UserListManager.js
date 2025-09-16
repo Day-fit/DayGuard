@@ -22,6 +22,26 @@ class UserListManager {
         this.updateUI = callback;
     }
 
+    // Seeds the active users list from REST response: [{ uuid, username }]
+    seedActiveUsersFromList(users) {
+        if (!Array.isArray(users)) return;
+        users.forEach(u => {
+            if (!u || !u.username || u.username === this.username) return;
+            this.activeUsers.add(u.username);
+            if (u.uuid) {
+                this.userUuids.set(u.username, u.uuid);
+            }
+        });
+        this.renderUsersList();
+    }
+
+    // Allows updating/setting a mapping explicitly
+    setUserUuid(username, uuid) {
+        if (username && uuid) {
+            this.userUuids.set(username, uuid);
+        }
+    }
+
     updateActiveUsers(data) {
         if (!data) return;
 

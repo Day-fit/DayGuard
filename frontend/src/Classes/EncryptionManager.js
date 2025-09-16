@@ -62,6 +62,36 @@ class EncryptionManager {
     }
 
     /**
+     * Rotate Signed PreKey: regenerate, sign, persist and upload
+     */
+    async rotateSignedPreKey() {
+        await this.initialize();
+        if (!this.identityKeyPair?.privateKey) {
+            throw new Error('Identity key unavailable for SPK rotation');
+        }
+        this.signedPreKeyPair = sodium.crypto_box_keypair();
+        this.signedPreKeySignature = sodium.crypto_sign_detached(
+            this.signedPreKeyPair.publicKey,
+            this.identityKeyPair.privateKey
+        );
+        this.saveKeysToStorage();
+        await this.uploadSpk(
+            sodium.to_base64(this.signedPreKeyPair.publicKey, sodium.base64_variants.ORIGINAL),
+            sodium.to_base64(this.signedPreKeySignature, sodium.base64_variants.ORIGINAL)
+        );
+    }
+
+    /**
+     * Generate and upload a single OPK public key
+     */
+    async uploadSingleOpk() {
+        await this.initialize();
+        const opk = sodium.crypto_box_keypair();
+        const opkPubB64 = sodium.to_base64(opk.publicKey, sodium.base64_variants.ORIGINAL);
+        await this.uploadOpkKeys([opkPubB64]);
+    }
+
+    /**
      * Upload SPK to server
      * @param {string} spkPublicKey - Base64 encoded SPK public key
      * @param {string} spkSignature - Base64 encoded SPK signature
@@ -272,18 +302,16 @@ class EncryptionManager {
         let sessionKey = this.sessionKeys.get(userId);
         let ephemeralPub = null;
 
-        // If no session key exists, perform X3DH key agreement
-        if (!sessionKey) {
+        // If no session key exists OR ephemeral pair missing, (re)perform X3DH to align state and expose ephemeral
+        const existingEphemeral = this.ephemeralKeys.get(userId);
+        if (!sessionKey || !existingEphemeral) {
             const preKeyBundle = await this.getPreKeyBundle(userId);
             const keyAgreement = await this.performX3DHKeyAgreement(userId, preKeyBundle);
             sessionKey = keyAgreement.sessionKey;
             ephemeralPub = keyAgreement.ephemeralPub;
         } else {
-            // Use existing ephemeral key
-            const ephemeralKeyPair = this.ephemeralKeys.get(userId);
-            if (ephemeralKeyPair) {
-                ephemeralPub = sodium.to_base64(ephemeralKeyPair.publicKey, sodium.base64_variants.ORIGINAL);
-            }
+            // Use existing ephemeral key corresponding to current session
+            ephemeralPub = sodium.to_base64(existingEphemeral.publicKey, sodium.base64_variants.ORIGINAL);
         }
 
         // Generate random nonce

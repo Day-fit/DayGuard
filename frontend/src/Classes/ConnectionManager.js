@@ -14,6 +14,8 @@ class ConnectionManager {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
         this.reconnectDelay = 1000;
+        this.spkRotationIntervalMs = 6 * 60 * 60 * 1000; // 6h default rotation check
+        this._spkRotationTimer = null;
     }
 
     setIdentifier(username) {
@@ -39,6 +41,8 @@ class ConnectionManager {
                 
                 await this.setupSubscriptions();
                 await this.notifyServerReady();
+                await this.fetchAndSeedActiveUsers();
+                this.startSpkRotationWatcher();
             },
             onStompError: (frame) => {
                 console.error('STOMP protocol error:', frame);
@@ -50,17 +54,61 @@ class ConnectionManager {
                 console.log('WebSocket connection closed:', event);
                 this.isConnected = false;
                 this.showConnectionStatus('Connection lost', 'warning');
+                this.stopSpkRotationWatcher();
                 this.handleReconnection();
             },
             onWebSocketError: (error) => {
                 console.error('WebSocket error:', error);
                 this.isConnected = false;
                 this.showConnectionStatus('Connection failed', 'error');
+                this.stopSpkRotationWatcher();
                 this.handleReconnection();
             }
         });
 
         this.stompClient.activate();
+    }
+
+    async fetchAndSeedActiveUsers() {
+        try {
+            const resp = await fetch('/api/v1/active-users', {
+                method: 'GET',
+                credentials: 'include'
+            });
+            if (!resp.ok) {
+                throw new Error(`Active users fetch failed: ${resp.status}`);
+            }
+            const users = await resp.json(); // [{ uuid, username }]
+            this.userListManager.seedActiveUsersFromList(users);
+        } catch (e) {
+            console.warn('Failed to fetch active users:', e);
+        }
+    }
+
+    startSpkRotationWatcher() {
+        this.stopSpkRotationWatcher();
+        this._spkRotationTimer = setInterval(async () => {
+            try {
+                await this.ensureSpkFreshness();
+            } catch (e) {
+                console.warn('SPK rotation attempt failed:', e);
+            }
+        }, this.spkRotationIntervalMs);
+    }
+
+    stopSpkRotationWatcher() {
+        if (this._spkRotationTimer) {
+            clearInterval(this._spkRotationTimer);
+            this._spkRotationTimer = null;
+        }
+    }
+
+    async ensureSpkFreshness(force = false) {
+        if (!this.encryptionManager?.isInitialized) return;
+        // Delegate to EncryptionManager rotation API
+        if (force || !this.encryptionManager.signedPreKeyPair?.publicKey) {
+            await this.encryptionManager.rotateSignedPreKey();
+        }
     }
 
     async setupSubscriptions() {
@@ -99,6 +147,13 @@ class ConnectionManager {
                             this.messageManager.incrementUnreadCount(msg.sender);
                             this.userListManager.renderUsersList();
                             this.showNotification(`New message from ${msg.sender}`, 'info');
+                        }
+
+                        // After receiving a message, upload a fresh OPK to keep pool filled
+                        try {
+                            await this.uploadSingleOpkIfPossible();
+                        } catch (opkErr) {
+                            console.debug('OPK replenishment skipped/failed:', opkErr);
                         }
                     }
                 } catch (error) {
@@ -144,6 +199,11 @@ class ConnectionManager {
                 }
             }
         );
+    }
+
+    async uploadSingleOpkIfPossible() {
+        if (!this.encryptionManager?.isInitialized) return;
+        await this.encryptionManager.uploadSingleOpk();
     }
 
     async notifyServerReady() {
@@ -341,6 +401,7 @@ class ConnectionManager {
     disconnect() {
         if (this.stompClient) {
             this.isConnected = false;
+            this.stopSpkRotationWatcher();
             this.stompClient.deactivate();
             this.userListManager.clearActiveUsers();
         }

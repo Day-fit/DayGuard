@@ -2,20 +2,13 @@ package pl.dayfit.dayguard.service;
 
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
 import pl.dayfit.dayguard.dto.ActivityMessageDTO;
 import pl.dayfit.dayguard.dto.MessageResponseDTO;
-import pl.dayfit.dayguard.event.UserReadyForMessagesEvent;
 import pl.dayfit.dayguard.message.AbstractMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
-import pl.dayfit.dayguard.message.DedicatedActivityMessage;
 import pl.dayfit.dayguard.message.MessageSender;
-import pl.dayfit.dayguard.type.ActivityType;
-
-import java.time.Instant;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -52,24 +45,6 @@ public class MessagingService implements MessageSender {
                 mqService.getBroadcastExchange().getName(),
                 "", //fanout exchange, routing key is ignored
                 message
-        );
-    }
-
-    @EventListener
-    public void sendActivateUsersList(UserReadyForMessagesEvent event)
-    {
-        log.debug("Sending activate users list to users activity exchange ...");
-
-        mqService.getActiveUsers().values().forEach(user ->
-                DedicatedActivityMessage.builder()
-                        .receiver(event.username())
-                        .targetUsername(user.getUsername())
-                        .id(user.getId())
-                        .messageUuid(UUID.randomUUID())
-                        .timestamp(Instant.now())
-                        .type(ActivityType.IS_CONNECTED)
-                        .build()
-                        .send()
         );
     }
 }

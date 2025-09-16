@@ -3,10 +3,8 @@ package pl.dayfit.dayguard.controller;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import pl.dayfit.dayguard.dto.AttachmentMessageRequestDTO;
 import pl.dayfit.dayguard.dto.TextMessageRequestDTO;
-import pl.dayfit.dayguard.event.UserReadyForMessagesEvent;
 import pl.dayfit.dayguard.message.AbstractMessage;
 import pl.dayfit.dayguard.message.AttachmentMessage;
 import pl.dayfit.dayguard.message.TextMessage;
@@ -26,7 +24,6 @@ import java.util.UUID;
 @RestController
 @AllArgsConstructor
 public class MessageController {
-    private final ApplicationEventPublisher applicationEventPublisher;
 
     @MessageMapping("/connection-ready")
     public ResponseEntity<Map<String, String>> handlePing(@NotNull Message<?> message)
@@ -39,7 +36,6 @@ public class MessageController {
             throw new IllegalArgumentException("User is not logged in");
         }
 
-        applicationEventPublisher.publishEvent(new UserReadyForMessagesEvent(principal.getName()));
         return ResponseEntity.ok(Map.of("message", "ack"));
     }
 

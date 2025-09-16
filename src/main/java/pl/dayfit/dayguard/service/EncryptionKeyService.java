@@ -92,7 +92,8 @@ public class EncryptionKeyService {
                 .map(opk -> new OpkPublicKey(null, opk, OpkStatus.ACTIVE, user.getId()))
                 .toList();
 
-        user.setOpkPubs(opkKeys);
+        user.getOpkPubs()
+                .addAll(opkKeys);
         userCacheService.save(user);
     }
 }
