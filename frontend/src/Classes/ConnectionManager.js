@@ -1,11 +1,12 @@
-import { Client } from '@stomp/stompjs';
+import {Client} from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import DOMPurify from 'dompurify';
 
 class ConnectionManager {
-    constructor(messageManager, userListManager) {
+    constructor(messageManager, userListManager, encryptionManager) {
         this.messageManager = messageManager;
         this.userListManager = userListManager;
+        this.encryptionManager = encryptionManager;
         this.stompClient = null;
         this.attachments = [];
         this.username = '';
@@ -13,6 +14,8 @@ class ConnectionManager {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
         this.reconnectDelay = 1000;
+        this.spkRotationIntervalMs = 6 * 60 * 60 * 1000; // 6h default rotation check
+        this._spkRotationTimer = null;
     }
 
     setIdentifier(username) {
@@ -38,6 +41,8 @@ class ConnectionManager {
                 
                 await this.setupSubscriptions();
                 await this.notifyServerReady();
+                await this.fetchAndSeedActiveUsers();
+                this.startSpkRotationWatcher();
             },
             onStompError: (frame) => {
                 console.error('STOMP protocol error:', frame);
@@ -49,12 +54,14 @@ class ConnectionManager {
                 console.log('WebSocket connection closed:', event);
                 this.isConnected = false;
                 this.showConnectionStatus('Connection lost', 'warning');
+                this.stopSpkRotationWatcher();
                 this.handleReconnection();
             },
             onWebSocketError: (error) => {
                 console.error('WebSocket error:', error);
                 this.isConnected = false;
                 this.showConnectionStatus('Connection failed', 'error');
+                this.stopSpkRotationWatcher();
                 this.handleReconnection();
             }
         });
@@ -62,14 +69,76 @@ class ConnectionManager {
         this.stompClient.activate();
     }
 
+    async fetchAndSeedActiveUsers() {
+        try {
+            const resp = await fetch('/api/v1/active-users', {
+                method: 'GET',
+                credentials: 'include'
+            });
+            if (!resp.ok) {
+                throw new Error(`Active users fetch failed: ${resp.status}`);
+            }
+            const users = await resp.json(); // [{ uuid, username }]
+            this.userListManager.seedActiveUsersFromList(users);
+        } catch (e) {
+            console.warn('Failed to fetch active users:', e);
+        }
+    }
+
+    startSpkRotationWatcher() {
+        this.stopSpkRotationWatcher();
+        this._spkRotationTimer = setInterval(async () => {
+            try {
+                await this.ensureSpkFreshness();
+            } catch (e) {
+                console.warn('SPK rotation attempt failed:', e);
+            }
+        }, this.spkRotationIntervalMs);
+    }
+
+    stopSpkRotationWatcher() {
+        if (this._spkRotationTimer) {
+            clearInterval(this._spkRotationTimer);
+            this._spkRotationTimer = null;
+        }
+    }
+
+    async ensureSpkFreshness(force = false) {
+        if (!this.encryptionManager?.isInitialized) return;
+        // Delegate to EncryptionManager rotation API
+        if (force || !this.encryptionManager.signedPreKeyPair?.publicKey) {
+            await this.encryptionManager.rotateSignedPreKey();
+        }
+    }
+
     async setupSubscriptions() {
         // Subscribe to personal messages
         this.stompClient.subscribe(
             `/user/${this.username}/queue/messages`,
-            (message) => {
+            async (message) => {
                 try {
                     const msg = JSON.parse(message.body);
                     if (!msg.fromMe) {
+                        // Try to decrypt the message if it contains encrypted data
+                        if (msg.ephemeralPub) {
+                            try {
+                                const senderUuid = this.userListManager.getUserUuid(msg.sender);
+                                if (senderUuid) {
+                                    msg.message = await this.encryptionManager.decryptMessage(
+                                        senderUuid,
+                                        msg.message,
+                                        msg.ephemeralPub
+                                    );
+                                } else {
+                                    console.warn('Cannot decrypt message: sender UUID not available');
+                                    msg.message = '[Encrypted message - decryption failed]';
+                                }
+                            } catch (decryptError) {
+                                console.error('Error decrypting message:', decryptError);
+                                msg.message = '[Encrypted message - decryption failed]';
+                            }
+                        }
+
                         this.messageManager.storeMessage(msg);
                         
                         if (msg.sender === this.userListManager.getSelectedReceiver()) {
@@ -78,6 +147,13 @@ class ConnectionManager {
                             this.messageManager.incrementUnreadCount(msg.sender);
                             this.userListManager.renderUsersList();
                             this.showNotification(`New message from ${msg.sender}`, 'info');
+                        }
+
+                        // After receiving a message, upload a fresh OPK to keep pool filled
+                        try {
+                            await this.uploadSingleOpkIfPossible();
+                        } catch (opkErr) {
+                            console.debug('OPK replenishment skipped/failed:', opkErr);
                         }
                     }
                 } catch (error) {
@@ -123,6 +199,11 @@ class ConnectionManager {
                 }
             }
         );
+    }
+
+    async uploadSingleOpkIfPossible() {
+        if (!this.encryptionManager?.isInitialized) return;
+        await this.encryptionManager.uploadSingleOpk();
     }
 
     async notifyServerReady() {
@@ -206,7 +287,7 @@ class ConnectionManager {
         }
     }
 
-    sendMessage(message) {
+    async sendMessage(message) {
         const selectedReceiver = this.userListManager.getSelectedReceiver();
 
         if ((!message && this.attachments.length === 0) || !selectedReceiver) {
@@ -226,21 +307,33 @@ class ConnectionManager {
 
         // Send text message first if it exists
         if (message && message.trim()) {
-            const textMessage = {
-                receiver: selectedReceiver,
-                message: message.trim()
-            };
-
-            console.log('Sending text message:', textMessage);
-
             try {
+                // Get receiver UUID for encryption
+                const receiverUuid = this.userListManager.getSelectedReceiverUuid();
+                if (!receiverUuid) {
+                    this.showNotification('Cannot send message: User UUID not available', 'error');
+                    return false;
+                }
+
+                // Encrypt the message (guard against missing bundle fields)
+                const encryptedData = await this.encryptionManager.encryptMessage(receiverUuid, message.trim());
+                
+                const textMessage = {
+                    receiver: selectedReceiver,
+                    ciphertext: encryptedData.ciphertext,
+                    ephemeralPub: encryptedData.ephemeralPub,
+                    message: encryptedData.ciphertext // Include for deserializer compatibility
+                };
+
+                console.log('Sending encrypted text message:', textMessage);
+
                 this.stompClient.publish({
                     destination: "/app/publish/text",
                     body: JSON.stringify(textMessage),
                     headers: { 'content-type': 'application/json' }
                 });
 
-                // Create a local message for display
+                // Create a local message for display (show plain text locally)
                 const outgoingTextMessage = {
                     sender: this.username,
                     receiver: selectedReceiver,
@@ -253,8 +346,8 @@ class ConnectionManager {
                 this.messageManager.displayMessage(outgoingTextMessage);
                 messagesSent++;
             } catch (error) {
-                console.error('Error sending text message:', error);
-                this.showNotification('Failed to send text message', 'error');
+                console.error('Error sending encrypted text message:', error);
+                this.showNotification('Failed to send encrypted message', 'error');
                 return false;
             }
         }
@@ -308,6 +401,7 @@ class ConnectionManager {
     disconnect() {
         if (this.stompClient) {
             this.isConnected = false;
+            this.stopSpkRotationWatcher();
             this.stompClient.deactivate();
             this.userListManager.clearActiveUsers();
         }

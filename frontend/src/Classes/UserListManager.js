@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify';
 class UserListManager {
     constructor() {
         this.activeUsers = new Set();
+        this.userUuids = new Map(); // Map<username, uuid>
         this.selectedReceiver = '';
         this.username = '';
         this.messageDisplay = null;
@@ -21,6 +22,26 @@ class UserListManager {
         this.updateUI = callback;
     }
 
+    // Seeds the active users list from REST response: [{ uuid, username }]
+    seedActiveUsersFromList(users) {
+        if (!Array.isArray(users)) return;
+        users.forEach(u => {
+            if (!u || !u.username || u.username === this.username) return;
+            this.activeUsers.add(u.username);
+            if (u.uuid) {
+                this.userUuids.set(u.username, u.uuid);
+            }
+        });
+        this.renderUsersList();
+    }
+
+    // Allows updating/setting a mapping explicitly
+    setUserUuid(username, uuid) {
+        if (username && uuid) {
+            this.userUuids.set(username, uuid);
+        }
+    }
+
     updateActiveUsers(data) {
         if (!data) return;
 
@@ -28,12 +49,22 @@ class UserListManager {
             case "IS_CONNECTED":
                 {
                     this.activeUsers.add(data.targetUsername);
+                    // Store UUID if provided (support both targetUuid and id)
+                    const uuid = data.targetUuid || data.id;
+                    if (uuid) {
+                        this.userUuids.set(data.targetUsername, uuid);
+                    }
                     this.renderUsersList();
                 }
                 break;
             case "JOIN":
                 if (data.targetUsername && data.targetUsername.trim() !== '') {
                     this.activeUsers.add(data.targetUsername);
+                    // Store UUID if provided (support both targetUuid and id)
+                    const uuid = data.targetUuid || data.id;
+                    if (uuid) {
+                        this.userUuids.set(data.targetUsername, uuid);
+                    }
                     this.renderUsersList();
                     this.messageDisplay.displayStatusMessage(`${data.targetUsername} has joined the chat`);
                 }
@@ -41,6 +72,7 @@ class UserListManager {
             case "LEAVE":
                 if (data.targetUsername) {
                     this.activeUsers.delete(data.targetUsername);
+                    this.userUuids.delete(data.targetUsername);
                     this.renderUsersList();
                     this.messageDisplay.displayStatusMessage(`${data.targetUsername} has left the chat`);
 
@@ -151,6 +183,7 @@ class UserListManager {
 
     clearActiveUsers() {
         this.activeUsers.clear();
+        this.userUuids.clear();
         this.selectedReceiver = '';
         this.messageDisplay.clearMessages();
         
@@ -166,6 +199,14 @@ class UserListManager {
 
     getSelectedReceiver() {
         return this.selectedReceiver;
+    }
+
+    getSelectedReceiverUuid() {
+        return this.userUuids.get(this.selectedReceiver);
+    }
+
+    getUserUuid(username) {
+        return this.userUuids.get(username);
     }
 
     // Add user to the list (for testing or manual addition)

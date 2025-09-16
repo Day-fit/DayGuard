@@ -19,6 +19,7 @@
   "dependencies": {
     "@stomp/stompjs": "^7.1.1",
     "dompurify": "^3.2.6",
+    "libsodium-wrappers": "^0.7.11",
     "sockjs-client": "^1.6.1",
     "validator": "^13.15.15",
     "zxcvbn": "^4.4.2"
