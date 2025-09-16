@@ -1,450 +1,513 @@
 import sodium from 'libsodium-wrappers';
 
 class EncryptionManager {
-    constructor() {
-        this.isInitialized = false;
-        this.identityKeyPair = null;
-        this.signedPreKeyPair = null;
-        this.signedPreKeySignature = null;
-        this.oneTimeKeys = [];
-        this.sessionKeys = new Map(); // Map<userId, sessionKey>
-        this.ephemeralKeys = new Map(); // Map<userId, ephemeralKeyPair>
-        this.peerEphemeral = new Map(); // Map<userId, last seen peer ephemeral pub (base64 ORIGINAL)>
-    }
+	constructor() {
+		this.isInitialized = false;
+		this.identityKeyPair = null;
+		this.signedPreKeyPair = null;
+		this.signedPreKeySignature = null;
+		this.oneTimeKeys = [];
+		this.sessionKeys = new Map(); // Map<userId, sessionKey>
+		this.ephemeralKeys = new Map(); // Map<userId, ephemeralKeyPair>
+		this.peerEphemeral = new Map(); // Map<userId, last seen peer ephemeral pub (base64 ORIGINAL)>
+	}
 
-    async initialize() {
-        if (this.isInitialized) return;
-        
-        await sodium.ready;
-        this.loadKeysFromStorage();
-        this.isInitialized = true;
-    }
+	async initialize() {
+		if (this.isInitialized) return;
+		
+		await sodium.ready;
+		await this.loadKeysFromStorage();
+		this.isInitialized = true;
+	}
 
-    /**
-     * Generate all required keys for registration
-     * @returns {Object} Object containing all keys in base64 format
-     */
-    generateKeysForRegistration() {
-        if (!this.isInitialized) {
-            throw new Error('EncryptionManager not initialized');
-        }
+	// --- IndexedDB helpers ---
+	_openDb() {
+		return new Promise((resolve, reject) => {
+			try {
+				const req = indexedDB.open('dg_e2ee', 1);
+				req.onupgradeneeded = () => {
+					const db = req.result;
+					if (!db.objectStoreNames.contains('keys')) {
+						db.createObjectStore('keys', { keyPath: 'id' });
+					}
+				};
+				req.onsuccess = () => resolve(req.result);
+				req.onerror = () => reject(req.error);
+			} catch (e) {
+				reject(e);
+			}
+		});
+	}
 
-        // Generate Identity Key (Ed25519)
-        this.identityKeyPair = sodium.crypto_sign_keypair();
-        
-        // Generate Signed Pre-Key (Curve25519 for ECDH)
-        this.signedPreKeyPair = sodium.crypto_box_keypair();
-        
-        // Sign the SPK public key (curve25519) with IK private key (ed25519)
-        this.signedPreKeySignature = sodium.crypto_sign_detached(
-            this.signedPreKeyPair.publicKey,
-            this.identityKeyPair.privateKey
-        );
+	_getFromDb(db, storeName, id) {
+		return new Promise((resolve, reject) => {
+			const tx = db.transaction(storeName, 'readonly');
+			tx.oncomplete = () => {};
+			tx.onerror = () => reject(tx.error);
+			const store = tx.objectStore(storeName);
+			const req = store.get(id);
+			req.onsuccess = () => resolve(req.result || null);
+			req.onerror = () => reject(req.error);
+		});
+	}
 
-        // Generate One-Time Keys (Curve25519 for ECDH)
-        const opkCount = 10; // Generate 10 OPKs
-        this.oneTimeKeys = [];
-        for (let i = 0; i < opkCount; i++) {
-            const opkPair = sodium.crypto_box_keypair();
-            this.oneTimeKeys.push(opkPair);
-        }
+	_putInDb(db, storeName, record) {
+		return new Promise((resolve, reject) => {
+			const tx = db.transaction(storeName, 'readwrite');
+			tx.oncomplete = () => resolve();
+			tx.onerror = () => reject(tx.error);
+			const store = tx.objectStore(storeName);
+			store.put(record);
+		});
+	}
 
-        const exported = {
-            ikPub: sodium.to_base64(this.identityKeyPair.publicKey, sodium.base64_variants.ORIGINAL),
-            spkPub: sodium.to_base64(this.signedPreKeyPair.publicKey, sodium.base64_variants.ORIGINAL),
-            spkSignature: sodium.to_base64(this.signedPreKeySignature, sodium.base64_variants.ORIGINAL),
-            opkPubs: this.oneTimeKeys.map(opk => sodium.to_base64(opk.publicKey, sodium.base64_variants.ORIGINAL))
-        };
+	/**
+	 * Generate all required keys for registration
+	 * @returns {Object} Object containing all keys in base64 format
+	 */
+	generateKeysForRegistration() {
+		if (!this.isInitialized) {
+			throw new Error('EncryptionManager not initialized');
+		}
 
-        // Persist private keys locally for session establishment
-        this.saveKeysToStorage();
-        return exported;
-    }
+		// Generate Identity Key (Ed25519)
+		this.identityKeyPair = sodium.crypto_sign_keypair();
+		
+		// Generate Signed Pre-Key (Curve25519 for ECDH)
+		this.signedPreKeyPair = sodium.crypto_box_keypair();
+		
+		// Sign the SPK public key (curve25519) with IK private key (ed25519)
+		this.signedPreKeySignature = sodium.crypto_sign_detached(
+			this.signedPreKeyPair.publicKey,
+			this.identityKeyPair.privateKey
+		);
 
-    /**
-     * Rotate Signed PreKey: regenerate, sign, persist and upload
-     */
-    async rotateSignedPreKey() {
-        await this.initialize();
-        if (!this.identityKeyPair?.privateKey) {
-            throw new Error('Identity key unavailable for SPK rotation');
-        }
-        this.signedPreKeyPair = sodium.crypto_box_keypair();
-        this.signedPreKeySignature = sodium.crypto_sign_detached(
-            this.signedPreKeyPair.publicKey,
-            this.identityKeyPair.privateKey
-        );
-        this.saveKeysToStorage();
-        await this.uploadSpk(
-            sodium.to_base64(this.signedPreKeyPair.publicKey, sodium.base64_variants.ORIGINAL),
-            sodium.to_base64(this.signedPreKeySignature, sodium.base64_variants.ORIGINAL)
-        );
-    }
+		// Generate One-Time Keys (Curve25519 for ECDH)
+		const opkCount = 10; // Generate 10 OPKs
+		this.oneTimeKeys = [];
+		for (let i = 0; i < opkCount; i++) {
+			const opkPair = sodium.crypto_box_keypair();
+			this.oneTimeKeys.push(opkPair);
+		}
 
-    /**
-     * Generate and upload a single OPK public key
-     */
-    async uploadSingleOpk() {
-        await this.initialize();
-        const opk = sodium.crypto_box_keypair();
-        const opkPubB64 = sodium.to_base64(opk.publicKey, sodium.base64_variants.ORIGINAL);
-        await this.uploadOpkKeys([opkPubB64]);
-    }
+		const exported = {
+			ikPub: sodium.to_base64(this.identityKeyPair.publicKey, sodium.base64_variants.ORIGINAL),
+			spkPub: sodium.to_base64(this.signedPreKeyPair.publicKey, sodium.base64_variants.ORIGINAL),
+			spkSignature: sodium.to_base64(this.signedPreKeySignature, sodium.base64_variants.ORIGINAL),
+			opkPubs: this.oneTimeKeys.map(opk => sodium.to_base64(opk.publicKey, sodium.base64_variants.ORIGINAL))
+		};
 
-    /**
-     * Upload SPK to server
-     * @param {string} spkPublicKey - Base64 encoded SPK public key
-     * @param {string} spkSignature - Base64 encoded SPK signature
-     */
-    async uploadSpk(spkPublicKey, spkSignature) {
-        try {
-            const response = await fetch('/api/v1/encryption/upload-spk', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    spkPublicKey,
-                    spkSignature
-                })
-            });
+		// Persist private keys locally for session establishment (async, fire-and-forget)
+		this.saveKeysToStorage();
+		return exported;
+	}
 
-            if (!response.ok) {
-                throw new Error(`SPK upload failed: ${response.status}`);
-            }
+	/**
+	 * Rotate Signed PreKey: regenerate, sign, persist and upload
+	 */
+	async rotateSignedPreKey() {
+		await this.initialize();
+		if (!this.identityKeyPair?.privateKey) {
+			throw new Error('Identity key unavailable for SPK rotation');
+		}
+		this.signedPreKeyPair = sodium.crypto_box_keypair();
+		this.signedPreKeySignature = sodium.crypto_sign_detached(
+			this.signedPreKeyPair.publicKey,
+			this.identityKeyPair.privateKey
+		);
+		await this.saveKeysToStorage();
+		await this.uploadSpk(
+			sodium.to_base64(this.signedPreKeyPair.publicKey, sodium.base64_variants.ORIGINAL),
+			sodium.to_base64(this.signedPreKeySignature, sodium.base64_variants.ORIGINAL)
+		);
+	}
 
-            return await response.json();
-        } catch (error) {
-            console.error('Error uploading SPK:', error);
-            throw error;
-        }
-    }
+	/**
+	 * Generate and upload a single OPK public key
+	 */
+	async uploadSingleOpk() {
+		await this.initialize();
+		const opk = sodium.crypto_box_keypair();
+		const opkPubB64 = sodium.to_base64(opk.publicKey, sodium.base64_variants.ORIGINAL);
+		await this.uploadOpkKeys([opkPubB64]);
+	}
 
-    /**
-     * Upload OPK keys to server
-     * @param {string[]} opkKeys - Array of base64 encoded OPK public keys
-     */
-    async uploadOpkKeys(opkKeys) {
-        try {
-            const response = await fetch('/api/v1/encryption/upload-opk-keys', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    opkKeys
-                })
-            });
+	/**
+	 * Upload SPK to server
+	 * @param {string} spkPublicKey - Base64 encoded SPK public key
+	 * @param {string} spkSignature - Base64 encoded SPK signature
+	 */
+	async uploadSpk(spkPublicKey, spkSignature) {
+		try {
+			const response = await fetch('/api/v1/encryption/upload-spk', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'include',
+				body: JSON.stringify({
+					spkPublicKey,
+					spkSignature
+				})
+			});
 
-            if (!response.ok) {
-                throw new Error(`OPK upload failed: ${response.status}`);
-            }
+			if (!response.ok) {
+				throw new Error(`SPK upload failed: ${response.status}`);
+			}
 
-            return await response.json();
-        } catch (error) {
-            console.error('Error uploading OPK keys:', error);
-            throw error;
-        }
-    }
+			return await response.json();
+		} catch (error) {
+			console.error('Error uploading SPK:', error);
+			throw error;
+		}
+	}
 
-    saveKeysToStorage() {
-        try {
-            const data = {
-                ikSk: sodium.to_base64(this.identityKeyPair?.privateKey || new Uint8Array(0), sodium.base64_variants.ORIGINAL),
-                ikPk: sodium.to_base64(this.identityKeyPair?.publicKey || new Uint8Array(0), sodium.base64_variants.ORIGINAL),
-                spkSk: sodium.to_base64(this.signedPreKeyPair?.privateKey || new Uint8Array(0), sodium.base64_variants.ORIGINAL),
-                spkPk: sodium.to_base64(this.signedPreKeyPair?.publicKey || new Uint8Array(0), sodium.base64_variants.ORIGINAL),
-                spkSig: this.signedPreKeySignature ? sodium.to_base64(this.signedPreKeySignature, sodium.base64_variants.ORIGINAL) : null
-            };
-            localStorage.setItem('dg_e2ee_keys', JSON.stringify(data));
-        } catch (e) {
-            console.warn('Failed to persist keys locally:', e);
-        }
-    }
+	/**
+	 * Upload OPK keys to server
+	 * @param {string[]} opkKeys - Array of base64 encoded OPK public keys
+	 */
+	async uploadOpkKeys(opkKeys) {
+		try {
+			const response = await fetch('/api/v1/encryption/upload-opk-keys', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				credentials: 'include',
+				body: JSON.stringify({
+					opkKeys
+				})
+			});
 
-    loadKeysFromStorage() {
-        try {
-            const raw = localStorage.getItem('dg_e2ee_keys');
-            if (!raw) return;
-            const data = JSON.parse(raw);
-            if (data?.ikSk && data?.ikPk) {
-                this.identityKeyPair = {
-                    privateKey: sodium.from_base64(data.ikSk, sodium.base64_variants.ORIGINAL),
-                    publicKey: sodium.from_base64(data.ikPk, sodium.base64_variants.ORIGINAL)
-                };
-            }
-            if (data?.spkSk && data?.spkPk) {
-                this.signedPreKeyPair = {
-                    privateKey: sodium.from_base64(data.spkSk, sodium.base64_variants.ORIGINAL),
-                    publicKey: sodium.from_base64(data.spkPk, sodium.base64_variants.ORIGINAL)
-                };
-            }
-            if (data?.spkSig) {
-                this.signedPreKeySignature = sodium.from_base64(data.spkSig, sodium.base64_variants.ORIGINAL);
-            }
-        } catch (e) {
-            console.warn('Failed to load stored keys:', e);
-        }
-    }
+			if (!response.ok) {
+				throw new Error(`OPK upload failed: ${response.status}`);
+			}
 
-    /**
-     * Get pre-key bundle for a user
-     * @param {string} userId - User UUID
-     * @returns {Object} Pre-key bundle
-     */
-    async getPreKeyBundle(userId) {
-        try {
-            const response = await fetch(`/api/v1/encryption/user/${userId}/get-pre-key-bundle`, {
-                method: 'GET',
-                credentials: 'include'
-            });
+			return await response.json();
+		} catch (error) {
+			console.error('Error uploading OPK keys:', error);
+			throw error;
+		}
+	}
 
-            if (!response.ok) {
-                throw new Error(`Failed to get pre-key bundle: ${response.status}`);
-            }
+	async saveKeysToStorage() {
+		try {
+			const data = {
+				ikSk: sodium.to_base64(this.identityKeyPair?.privateKey || new Uint8Array(0), sodium.base64_variants.ORIGINAL),
+				ikPk: sodium.to_base64(this.identityKeyPair?.publicKey || new Uint8Array(0), sodium.base64_variants.ORIGINAL),
+				spkSk: sodium.to_base64(this.signedPreKeyPair?.privateKey || new Uint8Array(0), sodium.base64_variants.ORIGINAL),
+				spkPk: sodium.to_base64(this.signedPreKeyPair?.publicKey || new Uint8Array(0), sodium.base64_variants.ORIGINAL),
+				spkSig: this.signedPreKeySignature ? sodium.to_base64(this.signedPreKeySignature, sodium.base64_variants.ORIGINAL) : null
+			};
+			const db = await this._openDb();
+			await this._putInDb(db, 'keys', { id: 'e2ee_keys', data });
+		} catch (e) {
+			// Fallback to localStorage if IndexedDB fails
+			try {
+				const data = {
+					ikSk: sodium.to_base64(this.identityKeyPair?.privateKey || new Uint8Array(0), sodium.base64_variants.ORIGINAL),
+					ikPk: sodium.to_base64(this.identityKeyPair?.publicKey || new Uint8Array(0), sodium.base64_variants.ORIGINAL),
+					spkSk: sodium.to_base64(this.signedPreKeyPair?.privateKey || new Uint8Array(0), sodium.base64_variants.ORIGINAL),
+					spkPk: sodium.to_base64(this.signedPreKeyPair?.publicKey || new Uint8Array(0), sodium.base64_variants.ORIGINAL),
+					spkSig: this.signedPreKeySignature ? sodium.to_base64(this.signedPreKeySignature, sodium.base64_variants.ORIGINAL) : null
+				};
+				localStorage.setItem('dg_e2ee_keys', JSON.stringify(data));
+			} catch (_) {}
+		}
+	}
 
-            return await response.json();
-        } catch (error) {
-            console.error('Error getting pre-key bundle:', error);
-            throw error;
-        }
-    }
+	async loadKeysFromStorage() {
+		let data = null;
+		try {
+			const db = await this._openDb();
+			const record = await this._getFromDb(db, 'keys', 'e2ee_keys');
+			data = record ? record.data : null;
+		} catch (_) {
+			// Fallback to localStorage
+			try {
+				const raw = localStorage.getItem('dg_e2ee_keys');
+				data = raw ? JSON.parse(raw) : null;
+			} catch (_) {}
+		}
 
-    /**
-     * Verify SPK signature
-     * @param {string} ikPub - Base64 encoded IK public key
-     * @param {string} spkPub - Base64 encoded SPK public key
-     * @param {string} spkSignature - Base64 encoded SPK signature
-     * @returns {boolean} True if signature is valid
-     */
-    verifySpkSignature(ikPub, spkPub, spkSignature) {
-        try {
-            const ikPubBytes = sodium.from_base64(ikPub, sodium.base64_variants.ORIGINAL);
-            const spkPubBytes = sodium.from_base64(spkPub, sodium.base64_variants.ORIGINAL);
-            const spkSigBytes = sodium.from_base64(spkSignature, sodium.base64_variants.ORIGINAL);
+		try {
+			if (!data) return;
+			if (data?.ikSk && data?.ikPk) {
+				this.identityKeyPair = {
+					privateKey: sodium.from_base64(data.ikSk, sodium.base64_variants.ORIGINAL),
+					publicKey: sodium.from_base64(data.ikPk, sodium.base64_variants.ORIGINAL)
+				};
+			}
+			if (data?.spkSk && data?.spkPk) {
+				this.signedPreKeyPair = {
+					privateKey: sodium.from_base64(data.spkSk, sodium.base64_variants.ORIGINAL),
+					publicKey: sodium.from_base64(data.spkPk, sodium.base64_variants.ORIGINAL)
+				};
+			}
+			if (data?.spkSig) {
+				this.signedPreKeySignature = sodium.from_base64(data.spkSig, sodium.base64_variants.ORIGINAL);
+			}
+		} catch (e) {
+			console.warn('Failed to load stored keys:', e);
+		}
+	}
 
-            return sodium.crypto_sign_verify_detached(spkSigBytes, spkPubBytes, ikPubBytes);
-        } catch (error) {
-            console.error('Error verifying SPK signature:', error);
-            return false;
-        }
-    }
+	/**
+	 * Get pre-key bundle for a user
+	 * @param {string} userId - User UUID
+	 * @returns {Object} Pre-key bundle
+	 */
+	async getPreKeyBundle(userId) {
+		try {
+			const response = await fetch(`/api/v1/encryption/user/${userId}/get-pre-key-bundle`, {
+				method: 'GET',
+				credentials: 'include'
+			});
 
-    /**
-     * Perform X3DH key agreement
-     * @param {string} userId - Target user ID
-     * @param {Object} preKeyBundle - Pre-key bundle from server
-     * @returns {Object} Session key and ephemeral key pair
-     */
-    async performX3DHKeyAgreement(userId, preKeyBundle) {
-        if (!this.isInitialized) {
-            throw new Error('EncryptionManager not initialized');
-        }
+			if (!response.ok) {
+				throw new Error(`Failed to get pre-key bundle: ${response.status}`);
+			}
 
-        if (!preKeyBundle || !preKeyBundle.ikPub || !preKeyBundle.spkPub || !preKeyBundle.spkSignature) {
-            throw new Error('Pre-key bundle is incomplete');
-        }
+			return await response.json();
+		} catch (error) {
+			console.error('Error getting pre-key bundle:', error);
+			throw error;
+		}
+	}
 
-        if (!this.identityKeyPair || !this.identityKeyPair.privateKey) {
-            throw new Error('Identity key is unavailable. Please re-login or re-register to restore keys.');
-        }
+	/**
+	 * Verify SPK signature
+	 * @param {string} ikPub - Base64 encoded IK public key
+	 * @param {string} spkPub - Base64 encoded SPK public key
+	 * @param {string} spkSignature - Base64 encoded SPK signature
+	 * @returns {boolean} True if signature is valid
+	 */
+	verifySpkSignature(ikPub, spkPub, spkSignature) {
+		try {
+			const ikPubBytes = sodium.from_base64(ikPub, sodium.base64_variants.ORIGINAL);
+			const spkPubBytes = sodium.from_base64(spkPub, sodium.base64_variants.ORIGINAL);
+			const spkSigBytes = sodium.from_base64(spkSignature, sodium.base64_variants.ORIGINAL);
 
-        // Verify SPK signature
-        if (!this.verifySpkSignature(preKeyBundle.ikPub, preKeyBundle.spkPub, preKeyBundle.spkSignature)) {
-            throw new Error('Invalid SPK signature');
-        }
+			return sodium.crypto_sign_verify_detached(spkSigBytes, spkPubBytes, ikPubBytes);
+		} catch (error) {
+			console.error('Error verifying SPK signature:', error);
+			return false;
+		}
+	}
 
-        // Generate ephemeral key pair (Curve25519)
-        const ephemeralKeyPair = sodium.crypto_box_keypair();
-        this.ephemeralKeys.set(userId, ephemeralKeyPair);
+	/**
+	 * Perform X3DH key agreement
+	 * @param {string} userId - Target user ID
+	 * @param {Object} preKeyBundle - Pre-key bundle from server
+	 * @returns {Object} Session key and ephemeral key pair
+	 */
+	async performX3DHKeyAgreement(userId, preKeyBundle) {
+		if (!this.isInitialized) {
+			throw new Error('EncryptionManager not initialized');
+		}
 
-        // Convert base64 keys to bytes
-        const ikPubBytes = sodium.from_base64(preKeyBundle.ikPub, sodium.base64_variants.ORIGINAL);
-        const spkPubBytes = sodium.from_base64(preKeyBundle.spkPub, sodium.base64_variants.ORIGINAL);
+		if (!preKeyBundle || !preKeyBundle.ikPub || !preKeyBundle.spkPub || !preKeyBundle.spkSignature) {
+			throw new Error('Pre-key bundle is incomplete');
+		}
 
-        // X3DH aligned derivation using only DH2 and DH3
-        // DH2: EK_A * IK_B(curve)
-        const ikCurvePkB = sodium.crypto_sign_ed25519_pk_to_curve25519(ikPubBytes);
-        const dh2 = sodium.crypto_scalarmult(ephemeralKeyPair.privateKey, ikCurvePkB);
-        // DH3: EK_A * SPK_B
-        const dh3 = sodium.crypto_scalarmult(ephemeralKeyPair.privateKey, spkPubBytes);
+		if (!this.identityKeyPair || !this.identityKeyPair.privateKey) {
+			throw new Error('Identity key is unavailable. Please re-login or re-register to restore keys.');
+		}
 
-        // Combine DH outputs
-        const parts = [dh2, dh3];
-        const totalLen = parts.reduce((acc, p) => acc + p.length, 0);
-        const combined = new Uint8Array(totalLen);
-        let offset = 0;
-        for (const p of parts) {
-            combined.set(p, offset);
-            offset += p.length;
-        }
+		// Verify SPK signature
+		if (!this.verifySpkSignature(preKeyBundle.ikPub, preKeyBundle.spkPub, preKeyBundle.spkSignature)) {
+			throw new Error('Invalid SPK signature');
+		}
 
-        // Derive session key using HKDF
-        const sessionKey = sodium.crypto_generichash(32, combined);
-        this.sessionKeys.set(userId, sessionKey);
+		// Generate ephemeral key pair (Curve25519)
+		const ephemeralKeyPair = sodium.crypto_box_keypair();
+		this.ephemeralKeys.set(userId, ephemeralKeyPair);
 
-        return {
-            sessionKey,
-            ephemeralKeyPair,
-            ephemeralPub: sodium.to_base64(ephemeralKeyPair.publicKey, sodium.base64_variants.ORIGINAL)
-        };
-    }
+		// Convert base64 keys to bytes
+		const ikPubBytes = sodium.from_base64(preKeyBundle.ikPub, sodium.base64_variants.ORIGINAL);
+		const spkPubBytes = sodium.from_base64(preKeyBundle.spkPub, sodium.base64_variants.ORIGINAL);
 
-    /**
-     * Encrypt message for a user
-     * @param {string} userId - Target user ID
-     * @param {string} message - Plain text message
-     * @returns {Object} Encrypted message with ephemeral public key
-     */
-    async encryptMessage(userId, message) {
-        if (!this.isInitialized) {
-            throw new Error('EncryptionManager not initialized');
-        }
+		// X3DH aligned derivation using only DH2 and DH3
+		// DH2: EK_A * IK_B(curve)
+		const ikCurvePkB = sodium.crypto_sign_ed25519_pk_to_curve25519(ikPubBytes);
+		const dh2 = sodium.crypto_scalarmult(ephemeralKeyPair.privateKey, ikCurvePkB);
+		// DH3: EK_A * SPK_B
+		const dh3 = sodium.crypto_scalarmult(ephemeralKeyPair.privateKey, spkPubBytes);
 
-        let sessionKey = this.sessionKeys.get(userId);
-        let ephemeralPub = null;
+		// Combine DH outputs
+		const parts = [dh2, dh3];
+		const totalLen = parts.reduce((acc, p) => acc + p.length, 0);
+		const combined = new Uint8Array(totalLen);
+		let offset = 0;
+		for (const p of parts) {
+			combined.set(p, offset);
+			offset += p.length;
+		}
 
-        // If no session key exists OR ephemeral pair missing, (re)perform X3DH to align state and expose ephemeral
-        const existingEphemeral = this.ephemeralKeys.get(userId);
-        if (!sessionKey || !existingEphemeral) {
-            const preKeyBundle = await this.getPreKeyBundle(userId);
-            const keyAgreement = await this.performX3DHKeyAgreement(userId, preKeyBundle);
-            sessionKey = keyAgreement.sessionKey;
-            ephemeralPub = keyAgreement.ephemeralPub;
-            // Cache the session key and ephemeral key pair for future use
-            this.sessionKeys.set(userId, keyAgreement.sessionKey);
-            if (keyAgreement.ephemeralKeyPair) {
-                this.ephemeralKeys.set(userId, keyAgreement.ephemeralKeyPair);
-            }
-        } else {
-            // Use existing ephemeral key corresponding to current session
-            ephemeralPub = sodium.to_base64(existingEphemeral.publicKey, sodium.base64_variants.ORIGINAL);
-        }
+		// Derive session key using HKDF
+		const sessionKey = sodium.crypto_generichash(32, combined);
+		this.sessionKeys.set(userId, sessionKey);
 
-        // Generate random nonce
-        const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
-        
-        // Encrypt message
-        const messageBytes = sodium.from_string(message);
-        const ciphertext = sodium.crypto_secretbox_easy(messageBytes, nonce, sessionKey);
-        
-        // Combine nonce and ciphertext
-        const encryptedData = new Uint8Array(nonce.length + ciphertext.length);
-        encryptedData.set(nonce, 0);
-        encryptedData.set(ciphertext, nonce.length);
+		return {
+			sessionKey,
+			ephemeralKeyPair,
+			ephemeralPub: sodium.to_base64(ephemeralKeyPair.publicKey, sodium.base64_variants.ORIGINAL)
+		};
+	}
 
-        return {
-            ciphertext: sodium.to_base64(encryptedData, sodium.base64_variants.ORIGINAL),
-            ephemeralPub
-        };
-    }
+	/**
+	 * Encrypt message for a user
+	 * @param {string} userId - Target user ID
+	 * @param {string} message - Plain text message
+	 * @returns {Object} Encrypted message with ephemeral public key
+	 */
+	async encryptMessage(userId, message) {
+		if (!this.isInitialized) {
+			throw new Error('EncryptionManager not initialized');
+		}
 
-    /**
-     * Decrypt message from a user
-     * @param {string} userId - Sender user ID
-     * @param {string} ciphertext - Base64 encoded encrypted message
-     * @param {string} ephemeralPub - Base64 encoded ephemeral public key
-     * @returns {string} Decrypted message
-     */
-    async decryptMessage(userId, ciphertext, ephemeralPub) {
-        if (!this.isInitialized) {
-            throw new Error('EncryptionManager not initialized');
-        }
+		let sessionKey = this.sessionKeys.get(userId);
+		let ephemeralPub = null;
 
-        // Ensure session exists and matches current peer ephemeral
-        let sessionKey = this.sessionKeys.get(userId);
-        const lastPeerEphemeral = this.peerEphemeral.get(userId);
-        const shouldRekey = !sessionKey || (ephemeralPub && lastPeerEphemeral && lastPeerEphemeral !== ephemeralPub);
-        if (shouldRekey && ephemeralPub) {
-            sessionKey = await this.deriveSessionKeyFromEphemeral(userId, ephemeralPub);
-            this.peerEphemeral.set(userId, ephemeralPub);
-        } else if (!sessionKey && !ephemeralPub) {
-            throw new Error('No session key available for decryption');
-        }
+		// If no session key exists OR ephemeral pair missing, (re)perform X3DH to align state and expose ephemeral
+		const existingEphemeral = this.ephemeralKeys.get(userId);
+		if (!sessionKey || !existingEphemeral) {
+			const preKeyBundle = await this.getPreKeyBundle(userId);
+			const keyAgreement = await this.performX3DHKeyAgreement(userId, preKeyBundle);
+			sessionKey = keyAgreement.sessionKey;
+			ephemeralPub = keyAgreement.ephemeralPub;
+			// Cache the session key and ephemeral key pair for future use
+			this.sessionKeys.set(userId, keyAgreement.sessionKey);
+			if (keyAgreement.ephemeralKeyPair) {
+				this.ephemeralKeys.set(userId, keyAgreement.ephemeralKeyPair);
+			}
+		} else {
+			// Use existing ephemeral key corresponding to current session
+			ephemeralPub = sodium.to_base64(existingEphemeral.publicKey, sodium.base64_variants.ORIGINAL);
+		}
 
-        if (!sessionKey) {
-            throw new Error('No session key available for decryption');
-        }
+		// Generate random nonce
+		const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
+		
+		// Encrypt message
+		const messageBytes = sodium.from_string(message);
+		const ciphertext = sodium.crypto_secretbox_easy(messageBytes, nonce, sessionKey);
+		
+		// Combine nonce and ciphertext
+		const encryptedData = new Uint8Array(nonce.length + ciphertext.length);
+		encryptedData.set(nonce, 0);
+		encryptedData.set(ciphertext, nonce.length);
 
-        // Decode encrypted data
-        const encryptedData = sodium.from_base64(ciphertext, sodium.base64_variants.ORIGINAL);
-        const nonce = encryptedData.slice(0, sodium.crypto_secretbox_NONCEBYTES);
-        const encryptedMessage = encryptedData.slice(sodium.crypto_secretbox_NONCEBYTES);
+		return {
+			ciphertext: sodium.to_base64(encryptedData, sodium.base64_variants.ORIGINAL),
+			ephemeralPub
+		};
+	}
 
-        // Decrypt message with one-shot re-derive fallback
-        try {
-            const decryptedBytes = sodium.crypto_secretbox_open_easy(encryptedMessage, nonce, sessionKey);
-            return sodium.to_string(decryptedBytes);
-        } catch (e) {
-            if (ephemeralPub) {
-                // Force re-derive and retry once
-                const rederived = await this.deriveSessionKeyFromEphemeral(userId, ephemeralPub);
-                const retried = sodium.crypto_secretbox_open_easy(encryptedMessage, nonce, rederived);
-                return sodium.to_string(retried);
-            }
-            throw e;
-        }
-    }
+	/**
+	 * Decrypt message from a user
+	 * @param {string} userId - Sender user ID
+	 * @param {string} ciphertext - Base64 encoded encrypted message
+	 * @param {string} ephemeralPub - Base64 encoded ephemeral public key
+	 * @returns {string} Decrypted message
+	 */
+	async decryptMessage(userId, ciphertext, ephemeralPub) {
+		if (!this.isInitialized) {
+			throw new Error('EncryptionManager not initialized');
+		}
 
-    /**
-     * Derive session key from ephemeral public key (receiver side)
-     * @param {string} userId - Sender user ID
-     * @param {string} ephemeralPub - Base64 encoded ephemeral public key
-     * @returns {Uint8Array} Session key
-     */
-    async deriveSessionKeyFromEphemeral(userId, ephemeralPub) {
-        if (!this.isInitialized) {
-            throw new Error('EncryptionManager not initialized');
-        }
+		// Ensure session exists and matches current peer ephemeral
+		let sessionKey = this.sessionKeys.get(userId);
+		const lastPeerEphemeral = this.peerEphemeral.get(userId);
+		const shouldRekey = !sessionKey || (ephemeralPub && lastPeerEphemeral && lastPeerEphemeral !== ephemeralPub);
+		if (shouldRekey && ephemeralPub) {
+			sessionKey = await this.deriveSessionKeyFromEphemeral(userId, ephemeralPub);
+			this.peerEphemeral.set(userId, ephemeralPub);
+		} else if (!sessionKey && !ephemeralPub) {
+			throw new Error('No session key available for decryption');
+		}
 
-        // Convert ephemeral public key to bytes
-        const ephemeralPubBytes = sodium.from_base64(ephemeralPub, sodium.base64_variants.ORIGINAL);
+		if (!sessionKey) {
+			throw new Error('No session key available for decryption');
+		}
 
-        // Receiver-side aligned derivation with DH2 and DH3
-        // DH2: IK_B(curve) * EK_A
-        const ikCurveSkB = sodium.crypto_sign_ed25519_sk_to_curve25519(this.identityKeyPair.privateKey);
-        const dh2 = sodium.crypto_scalarmult(ikCurveSkB, ephemeralPubBytes);
-        // DH3: SPK_B * EK_A
-        const dh3 = sodium.crypto_scalarmult(this.signedPreKeyPair.privateKey, ephemeralPubBytes);
+		// Decode encrypted data
+		const encryptedData = sodium.from_base64(ciphertext, sodium.base64_variants.ORIGINAL);
+		const nonce = encryptedData.slice(0, sodium.crypto_secretbox_NONCEBYTES);
+		const encryptedMessage = encryptedData.slice(sodium.crypto_secretbox_NONCEBYTES);
 
-        // Combine and derive session key
-        const combined = new Uint8Array(dh2.length + dh3.length);
-        combined.set(dh2, 0);
-        combined.set(dh3, dh2.length);
-        const sessionKey = sodium.crypto_generichash(32, combined);
-        this.sessionKeys.set(userId, sessionKey);
+		// Decrypt message with one-shot re-derive fallback
+		try {
+			const decryptedBytes = sodium.crypto_secretbox_open_easy(encryptedMessage, nonce, sessionKey);
+			return sodium.to_string(decryptedBytes);
+		} catch (e) {
+			if (ephemeralPub) {
+				// Force re-derive and retry once
+				const rederived = await this.deriveSessionKeyFromEphemeral(userId, ephemeralPub);
+				const retried = sodium.crypto_secretbox_open_easy(encryptedMessage, nonce, rederived);
+				return sodium.to_string(retried);
+			}
+			throw e;
+		}
+	}
 
-        return sessionKey;
-    }
+	/**
+	 * Derive session key from ephemeral public key (receiver side)
+	 * @param {string} userId - Sender user ID
+	 * @param {string} ephemeralPub - Base64 encoded ephemeral public key
+	 * @returns {Uint8Array} Session key
+	 */
+	async deriveSessionKeyFromEphemeral(userId, ephemeralPub) {
+		if (!this.isInitialized) {
+			throw new Error('EncryptionManager not initialized');
+		}
 
-    /**
-     * Clear session data for a user
-     * @param {string} userId - User ID
-     */
-    clearSession(userId) {
-        this.sessionKeys.delete(userId);
-        this.ephemeralKeys.delete(userId);
-    }
+		// Convert ephemeral public key to bytes
+		const ephemeralPubBytes = sodium.from_base64(ephemeralPub, sodium.base64_variants.ORIGINAL);
 
-    /**
-     * Clear all session data
-     */
-    clearAllSessions() {
-        this.sessionKeys.clear();
-        this.ephemeralKeys.clear();
-    }
+		// Receiver-side aligned derivation with DH2 and DH3
+		// DH2: IK_B(curve) * EK_A
+		const ikCurveSkB = sodium.crypto_sign_ed25519_sk_to_curve25519(this.identityKeyPair.privateKey);
+		const dh2 = sodium.crypto_scalarmult(ikCurveSkB, ephemeralPubBytes);
+		// DH3: SPK_B * EK_A
+		const dh3 = sodium.crypto_scalarmult(this.signedPreKeyPair.privateKey, ephemeralPubBytes);
 
-    /**
-     * Get current session status
-     * @returns {Object} Session status information
-     */
-    getSessionStatus() {
-        return {
-            isInitialized: this.isInitialized,
-            hasIdentityKey: !!this.identityKeyPair,
-            hasSignedPreKey: !!this.signedPreKeyPair,
-            oneTimeKeyCount: this.oneTimeKeys.length,
-            activeSessions: this.sessionKeys.size
-        };
-    }
+		// Combine and derive session key
+		const combined = new Uint8Array(dh2.length + dh3.length);
+		combined.set(dh2, 0);
+		combined.set(dh3, dh2.length);
+		const sessionKey = sodium.crypto_generichash(32, combined);
+		this.sessionKeys.set(userId, sessionKey);
+
+		return sessionKey;
+	}
+
+	/**
+	 * Clear session data for a user
+	 * @param {string} userId - User ID
+	 */
+	clearSession(userId) {
+		this.sessionKeys.delete(userId);
+		this.ephemeralKeys.delete(userId);
+	}
+
+	/**
+	 * Clear all session data
+	 */
+	clearAllSessions() {
+		this.sessionKeys.clear();
+		this.ephemeralKeys.clear();
+	}
+
+	/**
+	 * Get current session status
+	 * @returns {Object} Session status information
+	 */
+	getSessionStatus() {
+		return {
+			isInitialized: this.isInitialized,
+			hasIdentityKey: !!this.identityKeyPair,
+			hasSignedPreKey: !!this.signedPreKeyPair,
+			oneTimeKeyCount: this.oneTimeKeys.length,
+			activeSessions: this.sessionKeys.size
+		};
+	}
 }
 
 export default EncryptionManager;
