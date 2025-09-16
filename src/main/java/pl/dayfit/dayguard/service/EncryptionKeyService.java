@@ -42,7 +42,6 @@ public class EncryptionKeyService {
         }
 
         opkPub.setStatus(OpkStatus.CONSUMED);
-        opkPubs.set(0, opkPub);
 
         opkPublicKeyRepository.save(opkPub);
 
