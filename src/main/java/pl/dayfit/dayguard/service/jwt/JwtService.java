@@ -134,7 +134,7 @@ public class JwtService {
 
         try{
             return UUID.fromString(rawId);
-        } catch (NumberFormatException ex) {
+        } catch (IllegalArgumentException ex) {
             return null;
         }
     }
