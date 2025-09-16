@@ -18,13 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class ValidationTest {
     private static Validator validator;
-    private final CryptographyHelper helper;
-
-    public ValidationTest()
-    {
-        helper = new CryptographyHelper();
-    }
-
+    private static final CryptographyHelper helper = new CryptographyHelper();
     @BeforeAll
     static void setUp() {
         try(ValidatorFactory factory = Validation.buildDefaultValidatorFactory()){
