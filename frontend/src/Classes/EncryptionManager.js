@@ -309,6 +309,11 @@ class EncryptionManager {
             const keyAgreement = await this.performX3DHKeyAgreement(userId, preKeyBundle);
             sessionKey = keyAgreement.sessionKey;
             ephemeralPub = keyAgreement.ephemeralPub;
+            // Cache the session key and ephemeral key pair for future use
+            this.sessionKeys.set(userId, keyAgreement.sessionKey);
+            if (keyAgreement.ephemeralKeyPair) {
+                this.ephemeralKeys.set(userId, keyAgreement.ephemeralKeyPair);
+            }
         } else {
             // Use existing ephemeral key corresponding to current session
             ephemeralPub = sodium.to_base64(existingEphemeral.publicKey, sodium.base64_variants.ORIGINAL);
