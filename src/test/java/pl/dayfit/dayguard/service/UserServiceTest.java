@@ -68,7 +68,7 @@ class UserServiceTest {
     @Test
     void testCreateUser() {
         assertNotNull(testUser);
-        assertNotNull(testUser);
+        assertNotNull(testUser.getId());
         assertEquals("testuser", testUser.getUsername());
         assertEquals("test@example.com", testUser.getEmail());
     }
