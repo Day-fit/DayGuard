@@ -54,7 +54,6 @@ class UserServiceTest {
         testUser.setPassword("hashedPassword123");
         testUser.setSpkPub(spkPub);
         testUser.setIkPub(ikPub);
-        testUser.setSpkPub(spkPub);
         testUser.setSpkSignature(helper.generateSignature(ikPrivate, spkPub));
 
         testUser.setRoles(Collections.singletonList(new SimpleGrantedAuthority("user")));
