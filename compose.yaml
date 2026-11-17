@@ -93,14 +93,14 @@ services:
       - dev
 
   redis:
-    image: bitnami/redis:8.0.2
+    image: soldevelo/redis:8.0.3
     environment:
       - 'REDIS_PASSWORD=${REDIS_PASSWORD}'
     profiles:
       - prod
 
   redis-dev:
-    image: bitnami/redis:8.0.2
+    image: soldevelo/redis:8.0.3
     environment:
       - 'REDIS_PASSWORD=secret'
     ports:
